@@ -1,4 +1,6 @@
 .env
+.env.*
+!.env.example
 *.local
 node_modules/
 dist/
@@ -8,3 +10,24 @@ coverage/
 data/
 minio-data/
 uploads/
+*.tsbuildinfo
+test-results/
+playwright-report/
+.local/
+.test-build/
+
+# Local backups, credentials, editor state and operating-system files
+backups/
+*.dump
+*.bak
+*.pem
+*.key
+*.p12
+*.pfx
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/
+*.swp
+*.swo

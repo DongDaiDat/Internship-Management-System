@@ -30,9 +30,12 @@ services:
       context: ./backend
       target: development
     env_file: .env
+    environment:
+      APP_ORIGINS: ${APP_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000,http://localhost:8080,http://127.0.0.1:8080}
     volumes:
       - ./backend:/app
       - backend-node-modules:/app/node_modules
+      - backend-dist:/app/dist
     ports:
       - "3001:3001"
     depends_on:
@@ -47,9 +50,11 @@ services:
       target: development
     environment:
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
+      INTERNAL_API_URL: http://backend:3001
     volumes:
       - ./frontend:/app
       - frontend-node-modules:/app/node_modules
+      - frontend-next:/app/.next
     ports:
       - "3000:3000"
     depends_on:
@@ -70,4 +75,6 @@ volumes:
   postgres-data:
   minio-data:
   backend-node-modules:
+  backend-dist:
   frontend-node-modules:
+  frontend-next:

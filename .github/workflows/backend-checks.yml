@@ -1,0 +1,51 @@
+name: Backend checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test_runner
+          POSTGRES_PASSWORD: isolated_ci_only
+          POSTGRES_DB: internship_management_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U test_runner -d internship_management_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://test_runner:isolated_ci_only@localhost:5432/internship_management_test
+      TEST_DATABASE_URL: postgresql://test_runner:isolated_ci_only@localhost:5432/internship_management_test
+      MINIO_ENDPOINT: localhost
+      MINIO_PORT: 9000
+      MINIO_USE_SSL: "false"
+      MINIO_ROOT_USER: ci_file_test
+      MINIO_ROOT_PASSWORD: isolated_ci_files_only
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm run db:generate
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test
+      - name: Start isolated file storage
+        run: |
+          docker run -d --name internship-ci-minio -p 127.0.0.1:9000:9000 -e MINIO_ROOT_USER -e MINIO_ROOT_PASSWORD minio/minio:latest server /data
+          curl --fail --retry 15 --retry-connrefused --retry-delay 1 http://localhost:9000/minio/health/live
+      - run: npm run test:integration

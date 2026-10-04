@@ -1,0 +1,81 @@
+# Built LOCAL handoff, not Internet production. Separate volumes; only localhost:3300.
+name: internship-release
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Configure .env}
+      POSTGRES_USER: ${POSTGRES_USER:?Configure .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configure .env}
+    volumes:
+      - release-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  minio:
+    image: minio/minio:latest
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Configure .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Configure .env}
+    volumes:
+      - release-minio:/data
+  migrate:
+    build:
+      context: ./backend
+      target: migration
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Configure .env using hostname postgres}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+  backend:
+    build:
+      context: ./backend
+      target: release
+    environment:
+      # Explicit local HTTP mode: production Secure cookies require HTTPS.
+      NODE_ENV: development
+      DATABASE_URL: ${DATABASE_URL:?Configure .env using hostname postgres}
+      APP_ORIGINS: http://localhost:3300,http://127.0.0.1:3300
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: "9000"
+      MINIO_USE_SSL: "false"
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Configure .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Configure .env}
+    volumes:
+      - release-bootstrap:/app/.local
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://localhost:3001/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      minio:
+        condition: service_started
+  frontend:
+    build:
+      context: ./frontend
+      target: release
+      args:
+        INTERNAL_API_URL: http://backend:3001
+    ports:
+      - "127.0.0.1:3300:3000"
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://localhost:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 3s
+      timeout: 3s
+      start_period: 10s
+      retries: 30
+    depends_on:
+      backend:
+        condition: service_healthy
+volumes:
+  release-postgres:
+  release-minio:
+  release-bootstrap:

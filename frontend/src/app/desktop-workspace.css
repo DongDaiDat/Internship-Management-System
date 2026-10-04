@@ -1,0 +1,140 @@
+/* Shared desktop density and visual hierarchy for operational workspaces. */
+.staff-workspace .workspace-main .student-portal .card.editor {
+  display: grid;
+  gap: 16px;
+}
+.staff-workspace .workspace-main .editor fieldset {
+  margin-block: 8px;
+}
+.portal-workspace .workspace-topbar {
+  padding-inline: 32px;
+}
+.portal-workspace .workspace-heading h1 {
+  font-weight: 700;
+}
+.portal-workspace .workspace-main {
+  max-width: 1720px;
+}
+.staff-workspace .workspace-main .users-table th {
+  background: #edf1fb;
+  color: #425571;
+  font-size: 12px;
+  letter-spacing: 0;
+  padding: 14px 16px;
+}
+.staff-workspace .workspace-main .users-table td {
+  font-size: 14px;
+  padding: 14px 16px;
+  line-height: 1.5;
+}
+.staff-workspace .users-table td small {
+  font-size: 12px;
+  margin-top: 4px;
+}
+.staff-workspace .users-table tbody tr:hover {
+  background: #f7f9fe;
+}
+.staff-workspace .table-scroll {
+  border: 1px solid #e0e7f3;
+  border-radius: 12px;
+}
+.staff-workspace .workspace-main .users-table td .text-button {
+  padding-block: 4px;
+}
+.staff-workspace .workspace-main label {
+  font-size: 14px;
+}
+.staff-workspace .workspace-main .section-title > select {
+  width: auto;
+  min-width: 220px;
+  max-width: 340px;
+}
+.staff-workspace .filter-bar {
+  background: #fff;
+  border: 1px solid #e0e7f3;
+  border-radius: 12px;
+  padding: 16px 20px;
+  max-width: none;
+  margin-bottom: 24px;
+}
+.staff-workspace .filter-bar select {
+  max-width: 560px;
+}
+.staff-workspace .welcome-banner {
+  background: linear-gradient(110deg, #243b73, #37558d);
+  padding: 24px 32px;
+  border-left: 4px solid #f58220;
+}
+.staff-workspace .overview-metrics .card {
+  border-top: 3px solid #d7e1f5;
+}
+.staff-workspace .overview-metrics span,
+.staff-workspace .overview-metrics small {
+  font-size: 13px;
+}
+.staff-workspace .workspace-main .portal-entry {
+  padding: 16px 20px;
+  border: 1px solid #e0e7f3;
+  border-radius: 12px;
+  background: #fff;
+  margin: 0;
+}
+.staff-workspace .portal-entry summary {
+  color: #243b73;
+  font-weight: 600;
+  cursor: pointer;
+}
+.staff-workspace .portal-entry[open] {
+  background: #f8faff;
+}
+.staff-workspace .portal-entry[open] > summary {
+  margin-bottom: 16px;
+}
+.staff-workspace .assignment-detail > p {
+  margin: 0;
+}
+.staff-workspace .assignment-detail > h2 {
+  font-size: 23px;
+  margin: 0;
+}
+.staff-workspace .assignment-detail > progress {
+  height: 8px;
+  accent-color: #243b73;
+}
+.staff-workspace .assignment-detail > .file-panel {
+  order: 0;
+}
+.staff-workspace .workspace-main .button {
+  font-size: 14px;
+  box-shadow: none;
+}
+.staff-workspace .workspace-main .status {
+  font-size: 12px;
+  display: inline-block;
+}
+.staff-workspace .workspace-main .pagination {
+  padding-top: 16px;
+}
+@media (min-width: 1100px) {
+  .staff-workspace .workspace-main .editor > form > .button,
+  .staff-workspace .workspace-main .portal-entry form > .button {
+    justify-self: start;
+    min-width: 160px;
+    width: auto;
+  }
+  .staff-workspace .roster-picker label {
+    max-width: 800px;
+  }
+  .staff-workspace .assignment-detail .portal-entry form {
+    max-width: 900px;
+  }
+}
+@media (max-width: 760px) {
+  .portal-workspace .workspace-topbar {
+    padding-inline: 16px;
+  }
+  .staff-workspace .workspace-main .section-title > select {
+    min-width: 0;
+    width: 100%;
+  }
+}

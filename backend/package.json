@@ -2,16 +2,34 @@
   "name": "internship-management-backend",
   "private": true,
   "scripts": {
+    "db:seed-academic": "node scripts/seed-academic.cjs",
     "start:dev": "nest start --watch",
+    "start:docker": "prisma generate && prisma migrate deploy && node scripts/seed-academic.cjs && nest start --watch",
     "build": "nest build",
     "start": "node dist/main",
-    "lint": "eslint \"{src,test}/**/*.ts\"",
-    "test": "jest"
+    "lint": "eslint src --max-warnings 0",
+    "typecheck": "tsc --noEmit --incremental false",
+    "format": "prettier --write src test scripts package.json eslint.config.mjs",
+    "format:check": "prettier --check src test scripts package.json eslint.config.mjs",
+    "build:test": "tsc -p tsconfig.build.json --outDir .test-build --incremental false",
+    "test": "npm run build:test && node --test test/password.test.cjs test/session-guard.test.cjs",
+    "test:integration": "npm run build:test && node scripts/run-integration.cjs",
+    "test:upgrade": "npm run build:test && node scripts/run-upgrade-tests.cjs",
+    "db:generate": "prisma generate",
+    "db:deploy": "prisma migrate deploy",
+    "db:seed-demo": "npm run build && node scripts/seed-demo.cjs",
+    "db:seed-showcase": "npm run build && node scripts/seed-showcase.cjs"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "3.1131.0",
     "@nestjs/common": "^11.0.1",
     "@nestjs/core": "^11.0.1",
     "@nestjs/platform-express": "^11.0.1",
+    "@prisma/client": "6.19.0",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.2",
+    "exceljs": "^4.4.0",
+    "pdf-lib": "1.17.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"
   },
@@ -19,7 +37,18 @@
     "@nestjs/cli": "^11.0.0",
     "@nestjs/schematics": "^11.0.0",
     "@nestjs/testing": "^11.0.1",
+    "@types/express": "^5.0.0",
     "@types/node": "^22.10.1",
-    "typescript": "^5.7.2"
+    "eslint": "^9.0.0",
+    "prettier": "^3.0.0",
+    "prisma": "6.19.0",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.0.0"
+  },
+  "overrides": {
+    "multer": "2.3.0",
+    "effect": "3.20.0",
+    "deepmerge-ts": "8.0.0",
+    "uuid": "11.1.1"
   }
 }

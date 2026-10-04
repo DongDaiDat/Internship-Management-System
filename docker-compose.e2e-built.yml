@@ -1,0 +1,19 @@
+# Overlay on docker-compose.e2e.yml. Same QA volumes only; never release/main data.
+services:
+  backend:
+    image: internship-release-backend:latest
+    build:
+      target: release
+    volumes: !reset []
+    environment:
+      NODE_ENV: test
+      APP_ORIGINS: http://localhost:3200,http://127.0.0.1:3200
+    command:
+      - node
+      - -e
+      - "const u=new URL(process.env.DATABASE_URL); if(u.hostname!=='postgres'||u.pathname!=='/internship_management')throw Error('QA only'); u.pathname='/internship_sprint4_test'; process.env.DATABASE_URL=u.toString(); require('./dist/main.js');"
+  frontend:
+    image: internship-release-frontend:latest
+    build:
+      target: release
+    volumes: !reset []

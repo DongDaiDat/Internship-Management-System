@@ -1,0 +1,496 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  Student
+  Company
+  CompanySupervisor
+  FacultyMentor
+  InternshipCoordinator
+  FacultyManager
+  Admin
+}
+
+enum PeriodStatus {
+  Draft
+  Published
+  Closed
+}
+
+enum ApplicationStatus {
+  Draft
+  Submitted
+  NeedsRevision
+  Approved
+  Rejected
+  Cancelled
+}
+
+enum ExceptionStatus {
+  Pending
+  Approved
+  Rejected
+}
+
+enum WeeklyReportStatus {
+  Submitted
+  NeedsRevision
+  Reviewed
+}
+
+enum ImportType {
+  Students
+  Faculty
+  Companies
+}
+
+enum ImportStatus {
+  Preview
+  Confirmed
+  Expired
+}
+
+model User {
+  departmentId String? @db.Uuid
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  id           String    @id @default(uuid()) @db.Uuid
+  email        String    @unique @db.VarChar(254)
+  fullName     String    @db.VarChar(120)
+  passwordHash String    @db.VarChar(255)
+  isActive     Boolean   @default(true)
+  mustChangePassword Boolean @default(false)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  roles        UserRole[]
+  sessions     Session[]
+  auditLogs    AuditLog[]
+  studentProfile StudentProfile?
+  facultyProfile FacultyProfile?
+  companyRepresentative CompanyProfile? @relation("CompanyRepresentative")
+  companySupervisor CompanySupervisorProfile?
+  coordinatedPeriods InternshipPeriod[] @relation("PeriodCoordinator")
+  uploadedFiles FileDocument[]
+}
+
+model UserRole {
+  userId String @db.Uuid
+  role   Role
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, role])
+}
+
+model Session {
+  id        String   @id @default(uuid()) @db.Uuid
+  tokenHash String   @unique @db.Char(64)
+  userId    String   @db.Uuid
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  actorId   String?  @db.Uuid
+  action    String   @db.VarChar(80)
+  reason    String?  @db.VarChar(1000)
+  details   Json?
+  targetId  String?  @db.Uuid
+  createdAt DateTime @default(now())
+  actor     User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([actorId, createdAt])
+}
+
+model LoginThrottle {
+  key       String   @id @db.Char(64)
+  count     Int
+  expiresAt DateTime
+
+  @@index([expiresAt])
+}
+
+model StudentProfile {
+  majorId String? @db.Uuid
+  academicMajor Major? @relation(fields: [majorId], references: [id], onDelete: Restrict)
+  programId String? @db.Uuid
+  program TrainingProgram? @relation(fields: [programId], references: [id], onDelete: Restrict)
+  cohortId String? @db.Uuid
+  academicCohort Cohort? @relation(fields: [cohortId], references: [id], onDelete: Restrict)
+  departmentId String? @db.Uuid
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  importBatchId String? @db.Uuid
+  id                       String   @id @default(uuid()) @db.Uuid
+  userId                   String?  @unique @db.Uuid
+  studentCode              String   @unique @db.VarChar(30)
+  fullName                 String   @db.VarChar(120)
+  email                    String   @unique @db.VarChar(254)
+  className                String   @db.VarChar(80)
+  cohort                   String   @db.VarChar(30)
+  major                    String   @default("Công nghệ thông tin") @db.VarChar(120)
+  programCredits           Int
+  completedCredits         Int
+  hasMandatoryCourseDebt   Boolean  @default(false)
+  isVerified               Boolean  @default(false)
+  verifiedAt               DateTime?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+  user                     User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  applications             InternshipApplication[]
+  internships              Internship[]
+
+  @@index([isVerified, completedCredits])
+}
+
+model FacultyProfile {
+  departmentId String? @db.Uuid
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  importBatchId String? @db.Uuid
+  id                   String   @id @default(uuid()) @db.Uuid
+  userId               String?  @unique @db.Uuid
+  facultyCode          String   @unique @db.VarChar(30)
+  fullName             String   @db.VarChar(120)
+  email                String   @unique @db.VarChar(254)
+  expertise            String   @db.VarChar(160)
+  maxStudents          Int      @default(10)
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  user                 User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  supervisedInternships Internship[]
+}
+
+model CompanyProfile {
+  departmentId String? @db.Uuid
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  importBatchId String? @db.Uuid
+  id                   String   @id @default(uuid()) @db.Uuid
+  representativeUserId String?  @unique @db.Uuid
+  name                 String   @db.VarChar(160)
+  taxCode              String?  @unique @db.VarChar(30)
+  address              String   @db.VarChar(255)
+  website              String?  @db.VarChar(255)
+  contactName          String   @db.VarChar(120)
+  contactEmail         String   @db.VarChar(254)
+  contactPhone         String   @db.VarChar(30)
+  isVerified           Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  representative       User?    @relation("CompanyRepresentative", fields: [representativeUserId], references: [id], onDelete: SetNull)
+  supervisors          CompanySupervisorProfile[]
+  applications         InternshipApplication[]
+  internships          Internship[]
+
+  @@unique([name, contactEmail])
+  @@index([isVerified])
+}
+
+model CompanySupervisorProfile {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @unique @db.Uuid
+  companyId String   @db.Uuid
+  title     String   @db.VarChar(120)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company   CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  assignments CompanySupervisorAssignment[]
+  evaluations SupervisorEvaluation[]
+
+  @@index([companyId])
+}
+
+model InternshipPeriod {
+  departmentId String? @db.Uuid
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  roundNumber Int?
+  semester Int?
+  academicYear String? @db.VarChar(9)
+  audience PeriodAudience[]
+  @@unique([departmentId, roundNumber, semester, academicYear])
+  id                    String       @id @default(uuid()) @db.Uuid
+  name                  String @db.VarChar(160)
+  registrationStartsAt  DateTime
+  registrationEndsAt    DateTime
+  startsAt              DateTime
+  endsAt                DateTime
+  weeklyReportCount     Int
+  weeklyDeadlines       DateTime[]   @default([])
+  gradingDeadline       DateTime?
+  finalizationDeadline  DateTime?
+  creditThresholdPercent Int         @default(80)
+  coordinatorId         String?      @db.Uuid
+  coordinator           User?        @relation("PeriodCoordinator", fields: [coordinatorId], references: [id])
+  status                PeriodStatus @default(Draft)
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+  applications          InternshipApplication[]
+  internships           Internship[]
+
+  @@index([status, registrationStartsAt, registrationEndsAt], map: "InternshipPeriod_status_registrationStartsAt_registrationEndsAt")
+  @@index([coordinatorId])
+}
+
+model InternshipApplication {
+  id                String            @id @default(uuid()) @db.Uuid
+  periodId          String            @db.Uuid
+  studentId         String            @db.Uuid
+  companyId         String?           @db.Uuid
+  externalCompanyName String?         @db.VarChar(160)
+  externalCompanyContact String?      @db.VarChar(160)
+  externalCompanyEmail String?        @db.VarChar(254)
+  positionTitle     String            @db.VarChar(160)
+  eligibilityPassed Boolean           @default(false)
+  eligibilityReason String?           @db.VarChar(500)
+  status            ApplicationStatus @default(Draft)
+  submittedAt       DateTime?
+  reviewedAt        DateTime?
+  reviewNote        String?           @db.VarChar(500)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  period            InternshipPeriod  @relation(fields: [periodId], references: [id], onDelete: Restrict)
+  student           StudentProfile    @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  company           CompanyProfile?   @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  exceptionRequest  EligibilityExceptionRequest?
+  internship        Internship?
+
+  @@unique([periodId, studentId])
+  @@index([status, periodId])
+}
+
+model EligibilityExceptionRequest {
+  id            String          @id @default(uuid()) @db.Uuid
+  applicationId String          @unique @db.Uuid
+  reason        String          @db.VarChar(1000)
+  status        ExceptionStatus @default(Pending)
+  decisionNote  String?         @db.VarChar(500)
+  reviewedById  String?         @db.Uuid
+  reviewedAt    DateTime?
+  createdAt     DateTime        @default(now())
+  application   InternshipApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+}
+
+model Internship {
+  id                         String   @id @default(uuid()) @db.Uuid
+  applicationId              String   @unique @db.Uuid
+  periodId                   String   @db.Uuid
+  studentId                  String   @db.Uuid
+  companyId                  String?  @db.Uuid
+  facultyMentorId            String   @db.Uuid
+  eligibilitySnapshot        Json
+  startsAt                   DateTime
+  endsAt                     DateTime
+  createdAt                  DateTime @default(now())
+  application                InternshipApplication @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  period                     InternshipPeriod @relation(fields: [periodId], references: [id], onDelete: Restrict)
+  student                    StudentProfile @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  company                    CompanyProfile? @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  facultyMentor              FacultyProfile @relation(fields: [facultyMentorId], references: [id], onDelete: Restrict)
+  companySupervisorAssignments CompanySupervisorAssignment[]
+  weeklyReports              WeeklyReport[]
+  supervisorEvaluations      SupervisorEvaluation[]
+  facultyEvaluation          FacultyEvaluation?
+  finalReport                FinalReport?
+  finalGrade                 FinalGrade?
+  files                      FileDocument[]
+
+  @@index([facultyMentorId])
+  @@index([studentId])
+}
+
+model CompanySupervisorAssignment {
+  internshipId String @db.Uuid
+  supervisorId String @db.Uuid
+  assignedAt   DateTime @default(now())
+  internship   Internship @relation(fields: [internshipId], references: [id], onDelete: Cascade)
+  supervisor   CompanySupervisorProfile @relation(fields: [supervisorId], references: [id], onDelete: Cascade)
+
+  @@id([internshipId, supervisorId])
+}
+
+model WeeklyReport {
+  fileId      String? @db.Uuid
+  file        FileDocument? @relation(fields: [fileId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  id          String             @id @default(uuid()) @db.Uuid
+  internshipId String            @db.Uuid
+  weekNumber  Int
+  content     String             @db.VarChar(5000)
+  status      WeeklyReportStatus @default(Submitted)
+  mentorNote  String?            @db.VarChar(2000)
+  submittedAt DateTime           @default(now())
+  reviewedAt  DateTime?
+  internship  Internship         @relation(fields: [internshipId], references: [id], onDelete: Cascade)
+
+  @@unique([internshipId, weekNumber])
+  @@index([status])
+}
+
+model SupervisorEvaluation {
+  evidenceFileId String? @db.Uuid
+  evidenceFile FileDocument? @relation(fields: [evidenceFileId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  enteredById String? @db.Uuid
+  enteredOnBehalf Boolean @default(false)
+  id             String   @id @default(uuid()) @db.Uuid
+  internshipId   String   @db.Uuid
+  supervisorId   String?  @db.Uuid
+  discipline     Float
+  responsibility Float
+  knowledge      Float
+  outcome        Float
+  total          Float
+  evidenceNote   String?  @db.VarChar(500)
+  submittedAt    DateTime @default(now())
+  internship     Internship @relation(fields: [internshipId], references: [id], onDelete: Cascade)
+  supervisor     CompanySupervisorProfile? @relation(fields: [supervisorId], references: [id], onDelete: SetNull)
+
+  @@unique([internshipId, supervisorId])
+}
+
+model FacultyEvaluation {
+  id           String   @id @default(uuid()) @db.Uuid
+  internshipId String   @unique @db.Uuid
+  score        Float
+  note         String?  @db.VarChar(1000)
+  submittedAt  DateTime @default(now())
+  internship   Internship @relation(fields: [internshipId], references: [id], onDelete: Cascade)
+}
+
+model FinalReport {
+  fileId       String? @db.Uuid
+  file         FileDocument? @relation(fields: [fileId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  id           String   @id @default(uuid()) @db.Uuid
+  internshipId String   @unique @db.Uuid
+  content      String   @db.VarChar(10000)
+  score        Float?
+  mentorNote   String?  @db.VarChar(1000)
+  submittedAt  DateTime @default(now())
+  gradedAt     DateTime?
+  internship   Internship @relation(fields: [internshipId], references: [id], onDelete: Cascade)
+}
+
+model FinalGrade {
+  id                String   @id @default(uuid()) @db.Uuid
+  internshipId      String   @unique @db.Uuid
+  companyScore       Float
+  facultyScore       Float
+  finalReportScore   Float
+  total              Float
+  letterGrade        String   @db.VarChar(3)
+  passed             Boolean
+  snapshot           Json
+  lockedAt           DateTime @default(now())
+  internship         Internship @relation(fields: [internshipId], references: [id], onDelete: Cascade)
+}
+
+model FileDocument {
+  id String @id @default(uuid()) @db.Uuid
+  internshipId String @db.Uuid
+  internship Internship @relation(fields: [internshipId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  kind String @db.VarChar(16)
+  weekNumber Int?
+  supervisorId String? @db.Uuid
+  companyId String @db.Uuid
+  uploadedById String @db.Uuid
+  uploadedBy User @relation(fields: [uploadedById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  originalName String @db.VarChar(180)
+  objectKey String @unique @db.VarChar(255)
+  bucket String @db.VarChar(100)
+  size Int
+  sha256 String @db.VarChar(64)
+  createdAt DateTime @default(now())
+  weeklyReports WeeklyReport[]
+  finalReports FinalReport[]
+  evaluations SupervisorEvaluation[]
+  @@index([internshipId])
+}
+
+model ImportBatch {
+  departmentId String? @db.Uuid
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  id         String       @id @default(uuid()) @db.Uuid
+  type       ImportType
+  status     ImportStatus @default(Preview)
+  rows       Json
+  errors     Json
+  createdById String      @db.Uuid
+  createdAt  DateTime     @default(now())
+  confirmedAt DateTime?
+
+  @@index([type, status, createdAt])
+}
+
+model Department {
+  imports ImportBatch[]
+  id String @id @default(uuid()) @db.Uuid
+  code String @unique @db.VarChar(30)
+  name String @db.VarChar(160)
+  isActive Boolean @default(true)
+  users User[]
+  students StudentProfile[]
+  faculty FacultyProfile[]
+  companies CompanyProfile[]
+  periods InternshipPeriod[]
+  programs DepartmentProgram[]
+}
+model Major {
+  id String @id @default(uuid()) @db.Uuid
+  code String @unique @db.VarChar(30)
+  name String @db.VarChar(160)
+  isActive Boolean @default(true)
+  programs TrainingProgram[]
+  students StudentProfile[]
+  audience PeriodAudience[]
+}
+model TrainingProgram {
+  id String @id @default(uuid()) @db.Uuid
+  code String @unique @db.VarChar(30)
+  name String @db.VarChar(160)
+  isActive Boolean @default(true)
+  majorId String @db.Uuid
+  major Major @relation(fields: [majorId], references: [id], onDelete: Restrict)
+  departments DepartmentProgram[]
+  students StudentProfile[]
+  audience PeriodAudience[]
+}
+model DepartmentProgram {
+  id String @id @default(uuid()) @db.Uuid
+  departmentId String @db.Uuid
+  programId String @db.Uuid
+  confirmed Boolean @default(false)
+  source String @db.VarChar(1000)
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  program TrainingProgram @relation(fields: [programId], references: [id], onDelete: Restrict)
+  @@unique([departmentId, programId])
+}
+model Cohort {
+  id String @id @default(uuid()) @db.Uuid
+  code String @unique @db.VarChar(30)
+  name String @db.VarChar(160)
+  number Int @unique
+  admissionYear Int
+  isActive Boolean @default(true)
+  students StudentProfile[]
+  audience PeriodAudience[]
+}
+model PeriodAudience {
+  id String @id @default(uuid()) @db.Uuid
+  periodId String @db.Uuid
+  majorId String @db.Uuid
+  cohortId String @db.Uuid
+  programId String? @db.Uuid
+  period InternshipPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  major Major @relation(fields: [majorId], references: [id], onDelete: Restrict)
+  cohort Cohort @relation(fields: [cohortId], references: [id], onDelete: Restrict)
+  program TrainingProgram? @relation(fields: [programId], references: [id], onDelete: Restrict)
+  @@index([periodId])
+}

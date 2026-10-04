@@ -1,0 +1,48 @@
+# Isolated restore rehearsal only. No ports, main volumes, or automatic seed.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: internship_restore_test
+      POSTGRES_USER: ${POSTGRES_USER:?Configure .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configure .env}
+    volumes:
+      - restore-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  minio:
+    image: minio/minio:latest
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Configure .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Configure .env}
+    volumes:
+      - restore-minio:/data
+  verify:
+    image: internship-e2e-backend:latest
+    profiles: [verify]
+    env_file: .env
+    environment:
+      VERIFY_DATABASE_NAME: internship_restore_test
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: "9000"
+      MINIO_USE_SSL: "false"
+    working_dir: /app
+    command: node scripts/verify-restore.cjs compare
+    volumes:
+      - ./backend:/app
+      - qa-dependencies:/app/node_modules:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+volumes:
+  restore-postgres:
+  restore-minio:
+  qa-dependencies:
+    external: true
+    name: internship-e2e_e2e-backend-modules

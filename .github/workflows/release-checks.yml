@@ -1,0 +1,46 @@
+name: Local release checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Check Git candidates for private files
+        run: node scripts/check-public-files.cjs
+      - name: Configure isolated disposable CI stack
+        run: cp .env.example .env
+      - name: Build and start from empty volumes
+        run: docker compose -f docker-compose.release.yml up -d --build --wait
+      - name: Create local-only smoke accounts
+        run: docker compose -f docker-compose.release.yml exec -T backend node scripts/seed-demo.cjs
+      - run: npm ci
+        working-directory: frontend
+      - run: npx playwright install --with-deps chrome
+        working-directory: frontend
+      - run: node frontend/tests/sprint5-release.cjs
+      - name: Prepare isolated seven-actor QA tooling
+        run: docker compose -f docker-compose.e2e.yml build
+      - name: Full browser suite against built images
+        env:
+          QA_BUILT: "true"
+        run: node frontend/tests/run-sprint4.cjs
+      - name: Restart and repeat smoke
+        run: |
+          docker compose -f docker-compose.release.yml restart backend frontend
+          docker compose -f docker-compose.release.yml up -d --wait
+          node frontend/tests/sprint5-release.cjs
+      - name: Stop containers (keep volumes)
+        if: always()
+        run: |
+          docker compose -f docker-compose.release.yml stop
+          docker compose -f docker-compose.e2e.yml stop

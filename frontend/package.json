@@ -5,16 +5,36 @@
     "dev": "next dev -H 0.0.0.0",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "eslint src --max-warnings 0",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test tests/*.test.cjs",
+    "test:upgrade": "node tests/upgrade-browser.cjs",
+    "test:sprint2": "node tests/sprint2-browser.cjs",
+    "test:sprint3": "node tests/sprint3-browser.cjs",
+    "test:sprint4": "node tests/sprint4-roles.cjs",
+    "test:sprint4:onboarding": "node tests/sprint4-onboarding.cjs",
+    "test:sprint4:workflow": "node tests/sprint4-workflow.cjs",
+    "test:sprint4:import": "node tests/sprint4-import.cjs",
+    "test:sprint4:all": "node tests/run-sprint4.cjs",
+    "format": "prettier --write src tests eslint.config.mjs package.json",
+    "format:check": "prettier --check src tests eslint.config.mjs package.json"
   },
   "dependencies": {
-    "next": "^15.1.0",
+    "next": "15.5.25",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.0.0",
     "@types/node": "^22.10.1",
     "@types/react": "^19.0.1",
+    "eslint": "^9.0.0",
+    "eslint-config-next": "15.5.25",
+    "playwright": "1.62.1",
+    "prettier": "^3.9.6",
     "typescript": "^5.7.2"
+  },
+  "overrides": {
+    "postcss": "8.5.28"
   }
 }

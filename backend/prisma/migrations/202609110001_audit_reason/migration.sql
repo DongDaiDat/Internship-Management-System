@@ -1,0 +1,1 @@
+ALTER TABLE "AuditLog" ADD COLUMN "reason" VARCHAR(1000);
