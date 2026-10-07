@@ -63,23 +63,6 @@ Với dependencies backend: `docker compose exec backend npm ci`, sau đó `dock
 
 Sprint 4 có stack QA tách database/kho tệp khỏi dữ liệu chính. Chạy từ gốc dự án `docker compose -f docker-compose.e2e.yml up -d --build`, sau đó từ `frontend` chạy `npm run test:sprint4:all` (cần dependencies frontend, Docker và Chrome trên host). Xem [biên bản Sprint 4 và hướng dẫn](docs/SPRINT_4_ACCEPTANCE.md). Không dùng `down -v` hoặc tài khoản thật cho bộ test này.
 
-## Đưa lên GitHub
-
-Trước khi stage/commit, chạy `node scripts/check-public-files.cjs`, kiểm tra `git status` và `git diff --cached`. Scanner chỉ hỗ trợ phát hiện một số file/token nhạy cảm, không thay thế rà soát thủ công. Các workflow backend/frontend/release đã có trong `.github/workflows`; việc có file workflow không có nghĩa đã chạy đạt trên GitHub. Không commit backup hoặc mật khẩu bàn giao.
-
-Tạo một repository rỗng trên GitHub, không tạo README hoặc `.gitignore` tại GitHub. Trong thư mục này, chạy:
-
-```powershell
-git init
-git add .
-git commit -m "chore: initialize internship management scaffold"
-git branch -M main
-git remote add origin https://github.com/<tai-khoan>/<ten-repository>.git
-git push -u origin main
-```
-
-Không commit `.env`, dữ liệu database hay file upload. Hãy chỉ commit `.env.example`.
-
 ## Nơi đặt mã nguồn về sau
 
 Tài liệu bàn giao: [nghiệp vụ/quyền/use case](docs/BUSINESS_HANDOVER.md), [import và cấp tài khoản](docs/IMPORT_ACCOUNTS.md), [ERD](docs/ERD.md), [cài đặt local](docs/LOCAL_RELEASE.md), [backup/restore](docs/BACKUP_RESTORE.md).
