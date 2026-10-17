@@ -298,7 +298,10 @@ test("me ignores supplied user ID and returns only the current identity", async 
   assert.equal(response.status, 200);
   const result = await response.json();
   assert.equal(result.id, student.id);
-  assert.deepEqual(result.permissions, ["internships:student"]);
+  assert.deepEqual(result.permissions, [
+    "internships:student",
+    "reports:student",
+  ]);
   assert.equal(response.headers.get("cache-control"), "no-store");
 });
 test("only a coordinator can create a valid locked internship period", async () => {

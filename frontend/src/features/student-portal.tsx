@@ -2,6 +2,13 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api";
+import { useSearchParams } from "next/navigation";
+import {
+  MentorFields,
+  MentorHistory,
+  StudentMentorEditor,
+  MentorRequest,
+} from "./mentor-request-ui";
 import Link from "next/link";
 import {
   StudentHome,
@@ -21,6 +28,8 @@ export type Period = {
   weeklyReportCount: number;
 };
 type Application = {
+  mentorRequests?: MentorRequest[];
+  internship?: { facultyMentor: { fullName: string } } | null;
   id: string;
   status: string;
   period: Period;
@@ -92,7 +101,12 @@ export type StudentView =
   | "documents"
   | "results";
 export function StudentPortal({ view = "overview" }: { view?: StudentView }) {
-  const [selectedId, setSelectedId] = useState("");
+  const params = useSearchParams();
+  const [registrationPeriod, setRegistrationPeriod] = useState("");
+  const [registrationRevision, setRegistrationRevision] = useState(0);
+  const [selectedId, setSelectedId] = useState(
+    params.get("internshipId") || "",
+  );
   const [reportDirty, setReportDirty] = useState(false);
   const [data, setData] = useState<StudentData | null>(null);
   const [periods, setPeriods] = useState<Period[]>([]);
@@ -104,6 +118,7 @@ export function StudentPortal({ view = "overview" }: { view?: StudentView }) {
   const [busy, setBusy] = useState(false);
   const [external, setExternal] = useState(false);
   const [cancelId, setCancelId] = useState<string | null>(null);
+  useEffect(() => setSelectedId(params.get("internshipId") || ""), [params]);
   const load = useCallback(async () => {
     const [mine, availablePeriods, availableCompanies] = await Promise.all([
       api<StudentData>("/internships/mine"),
@@ -151,8 +166,11 @@ export function StudentPortal({ view = "overview" }: { view?: StudentView }) {
         Object.fromEntries(new FormData(form)),
         "Đã gửi hồ sơ đăng ký. Xem kết quả tại mục Hồ sơ đăng ký.",
       )
-    )
+    ) {
       form.reset();
+      setRegistrationPeriod("");
+      setRegistrationRevision((v) => v + 1);
+    }
   }
   return (
     <section className="student-portal" aria-label="Hồ sơ thực tập của tôi">
@@ -190,7 +208,14 @@ export function StudentPortal({ view = "overview" }: { view?: StudentView }) {
         <>
           {view === "overview" && <StudentHome data={data} />}
           {view === "profile" && (
-            <StudentProfile profile={data.profile} onSaved={load} />
+            <StudentProfile
+              profile={data.profile}
+              completedInternships={
+                data.internships.filter((internship) => !!internship.finalGrade)
+                  .length
+              }
+              onSaved={load}
+            />
           )}
           {view === "registration" && (
             <section className="card editor">
@@ -230,6 +255,7 @@ export function StudentPortal({ view = "overview" }: { view?: StudentView }) {
                       <select
                         aria-label="Đợt thực tập"
                         name="periodId"
+                        onChange={(e) => setRegistrationPeriod(e.target.value)}
                         required
                         defaultValue=""
                       >
@@ -315,6 +341,10 @@ export function StudentPortal({ view = "overview" }: { view?: StudentView }) {
                         placeholder="Ví dụ: Lập trình viên frontend"
                       />
                     </label>
+                    <MentorFields
+                      key={`${registrationPeriod}-${registrationRevision}`}
+                      periodId={registrationPeriod}
+                    />
                     <button className="button primary">
                       {busy ? "Đang gửi…" : "Gửi đăng ký"}
                     </button>
@@ -329,92 +359,119 @@ export function StudentPortal({ view = "overview" }: { view?: StudentView }) {
               {!data.applications.length && (
                 <p className="empty-state">Bạn chưa gửi đăng ký thực tập.</p>
               )}
-              {data.applications.map((a) => (
-                <article className="portal-entry" key={a.id}>
-                  <h3>{a.period.name}</h3>
-                  <p>{a.company?.name || a.externalCompanyName}</p>
-                  <span className="subtle-badge">
-                    {labels[a.status] || "Đang xử lý"}
-                  </span>
-                  {a.eligibilityReason && <p>{a.eligibilityReason}</p>}
-                  {a.reviewNote && (
-                    <p className="notice">Kết luận của khoa: {a.reviewNote}</p>
-                  )}
-                  {a.exceptionRequest ? (
-                    <p>
-                      Ngoại lệ:{" "}
-                      {labels[a.exceptionRequest.status] || "Đang xử lý"}
-                    </p>
-                  ) : (
-                    a.eligibilityReason &&
-                    a.status === "Submitted" && (
-                      <details>
-                        <summary>Gửi yêu cầu ngoại lệ</summary>
-                        <form
-                          onSubmit={(e) => {
-                            e.preventDefault();
-                            void mutate(
-                              `/internship-applications/${a.id}/exceptions`,
-                              Object.fromEntries(new FormData(e.currentTarget)),
-                              "Đã gửi yêu cầu ngoại lệ đến Trưởng khoa.",
-                            );
-                          }}
-                        >
-                          <label>
-                            Lý do
-                            <textarea
-                              name="reason"
-                              minLength={10}
-                              maxLength={1000}
-                              required
-                            />
-                          </label>
-                          <button className="button secondary" disabled={busy}>
-                            Gửi yêu cầu
+              {data.applications
+                .filter(
+                  (a) =>
+                    !params.get("applicationId") ||
+                    a.id === params.get("applicationId"),
+                )
+                .map((a) => (
+                  <article className="portal-entry" key={a.id}>
+                    <h3>{a.period.name}</h3>
+                    <p>{a.company?.name || a.externalCompanyName}</p>
+                    <span className="subtle-badge">
+                      {labels[a.status] || "Đang xử lý"}
+                    </span>
+                    <MentorHistory
+                      requests={a.mentorRequests}
+                      assigned={a.internship?.facultyMentor.fullName}
+                    />
+                    {registrationOpen(a.period) &&
+                      ["Submitted", "NeedsRevision"].includes(a.status) && (
+                        <StudentMentorEditor
+                          id={a.id}
+                          periodId={a.period.id}
+                          requests={a.mentorRequests ?? []}
+                          busy={busy}
+                          mutate={mutate}
+                        />
+                      )}
+                    {a.eligibilityReason && <p>{a.eligibilityReason}</p>}
+                    {a.reviewNote && (
+                      <p className="notice">
+                        Kết luận của khoa: {a.reviewNote}
+                      </p>
+                    )}
+                    {a.exceptionRequest ? (
+                      <p>
+                        Ngoại lệ:{" "}
+                        {labels[a.exceptionRequest.status] || "Đang xử lý"}
+                      </p>
+                    ) : (
+                      a.eligibilityReason &&
+                      a.status === "Submitted" && (
+                        <details>
+                          <summary>Gửi yêu cầu ngoại lệ</summary>
+                          <form
+                            onSubmit={(e) => {
+                              e.preventDefault();
+                              void mutate(
+                                `/internship-applications/${a.id}/exceptions`,
+                                Object.fromEntries(
+                                  new FormData(e.currentTarget),
+                                ),
+                                "Đã gửi yêu cầu ngoại lệ đến Trưởng khoa.",
+                              );
+                            }}
+                          >
+                            <label>
+                              Lý do
+                              <textarea
+                                name="reason"
+                                minLength={10}
+                                maxLength={1000}
+                                required
+                              />
+                            </label>
+                            <button
+                              className="button secondary"
+                              disabled={busy}
+                            >
+                              Gửi yêu cầu
+                            </button>
+                          </form>
+                        </details>
+                      )
+                    )}
+                    {registrationOpen(a.period) &&
+                      ["Draft", "Submitted", "NeedsRevision"].includes(
+                        a.status,
+                      ) &&
+                      (cancelId === a.id ? (
+                        <div className="notice">
+                          <p>Xác nhận hủy hồ sơ đăng ký này?</p>
+                          <button
+                            className="button secondary"
+                            disabled={busy}
+                            onClick={() =>
+                              void mutate(
+                                `/internship-applications/${a.id}/cancel`,
+                                {},
+                                "Đã hủy đăng ký.",
+                              )
+                            }
+                          >
+                            Xác nhận hủy
+                          </button>{" "}
+                          <button
+                            className="text-button"
+                            disabled={busy}
+                            onClick={() => setCancelId(null)}
+                          >
+                            Giữ hồ sơ
                           </button>
-                        </form>
-                      </details>
-                    )
-                  )}
-                  {registrationOpen(a.period) &&
-                    ["Draft", "Submitted", "NeedsRevision"].includes(
-                      a.status,
-                    ) &&
-                    (cancelId === a.id ? (
-                      <div className="notice">
-                        <p>Xác nhận hủy hồ sơ đăng ký này?</p>
-                        <button
-                          className="button secondary"
-                          disabled={busy}
-                          onClick={() =>
-                            void mutate(
-                              `/internship-applications/${a.id}/cancel`,
-                              {},
-                              "Đã hủy đăng ký.",
-                            )
-                          }
-                        >
-                          Xác nhận hủy
-                        </button>{" "}
+                        </div>
+                      ) : (
                         <button
                           className="text-button"
                           disabled={busy}
-                          onClick={() => setCancelId(null)}
+                          onClick={() => setCancelId(a.id)}
                         >
-                          Giữ hồ sơ
+                          Hủy đăng ký
                         </button>
-                      </div>
-                    ) : (
-                      <button
-                        className="text-button"
-                        disabled={busy}
-                        onClick={() => setCancelId(a.id)}
-                      >
-                        Hủy đăng ký
-                      </button>
-                    ))}
-                </article>
-              ))}
+                      ))}
+                  </article>
+                ))}
             </section>
           )}
           {["reports", "documents", "results"].includes(view) &&
@@ -425,6 +482,7 @@ export function StudentPortal({ view = "overview" }: { view?: StudentView }) {
                     Kỳ thực tập
                     <select
                       aria-label="Kỳ thực tập"
+                      disabled={busy}
                       value={selectedId || data.internships[0].id}
                       onChange={(e) => {
                         if (

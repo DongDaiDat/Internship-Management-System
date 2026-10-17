@@ -979,3 +979,243 @@ button:disabled {
     padding: 8px 12px;
   }
 }
+.mentor-request-fields,
+.mentor-request-summary {
+  padding: 16px;
+  margin-block: 16px;
+  border: 1px solid #dce4f0;
+  border-radius: 12px;
+  background: #f5f7fb;
+  overflow-wrap: anywhere;
+}
+.mentor-request-summary p {
+  margin-block: 8px;
+}
+.mentor-request-fields {
+  display: grid;
+  gap: 16px;
+}
+.mentor-request-fields > p {
+  margin: 0;
+}
+.mentor-request-summary li + li {
+  margin-top: 16px;
+}
+.mentor-request-filters {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1fr;
+  gap: 16px;
+}
+.mentor-request-summary summary {
+  cursor: pointer;
+  color: #123b70;
+}
+@media (max-width: 700px) {
+  .mentor-request-filters {
+    grid-template-columns: 1fr;
+  }
+}
+/* Shared reporting pages: consistent spacing and contained desktop tables. */
+.summary-controls,
+.summary-breakdowns .card {
+  margin-bottom: 24px;
+}
+.summary-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.summary-heading h2 {
+  margin: 0 0 8px;
+}
+.summary-search {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+.summary-search label {
+  width: 100%;
+  font-weight: 600;
+}
+.summary-search input {
+  flex: 1;
+  min-width: 220px;
+}
+.summary-filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.summary-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  min-width: 0;
+}
+.summary-filters select {
+  width: 100%;
+  min-width: 0;
+}
+.summary-extra {
+  margin-top: 16px;
+}
+.summary-extra summary,
+.summary-history summary {
+  cursor: pointer;
+  color: #123b70;
+  font-weight: 600;
+  padding: 8px 0;
+}
+.summary-extra[open] summary {
+  margin-bottom: 16px;
+}
+.summary-table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+.summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.summary-table th {
+  text-align: left;
+  background: #f0f4fa;
+  color: #123b70;
+  padding: 16px;
+  white-space: nowrap;
+}
+.summary-table td {
+  padding: 16px;
+  vertical-align: top;
+  border-bottom: 1px solid #e4eaf2;
+  min-width: 120px;
+}
+.summary-table td small {
+  display: block;
+  color: #566780;
+  margin-top: 8px;
+}
+.summary-table td strong {
+  display: block;
+}
+.summary-status {
+  display: inline-block;
+  border-radius: 16px;
+  padding: 4px 10px;
+  background: #edf2fa;
+  color: #123b70;
+  white-space: nowrap;
+}
+.summary-status-active {
+  background: #e5f5ec;
+  color: #17623a;
+}
+.summary-status-awaiting {
+  background: #fff0dd;
+  color: #855000;
+}
+.summary-status-cancelled {
+  background: #fdebec;
+  color: #a22737;
+}
+.summary-warning {
+  color: #9a4900 !important;
+}
+.summary-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  margin-top: 24px;
+}
+.summary-breakdowns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  margin-top: 24px;
+}
+.summary-history article {
+  border-left: 3px solid #f58220;
+  padding: 8px 12px;
+  margin: 12px 0;
+  min-width: 230px;
+}
+.summary-history article p {
+  margin: 8px 0;
+}
+.summary-empty {
+  text-align: center;
+  padding: 40px 16px;
+  color: #566780;
+}
+.summary-task {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 16px 0;
+  border-bottom: 1px solid #e4eaf2;
+  text-decoration: none;
+}
+.summary-task strong {
+  margin-left: auto;
+}
+.summary-metrics a {
+  text-decoration: none;
+  color: #172b4d;
+}
+.summary-metrics a:hover {
+  border-color: #f58220;
+}
+.summary-controls input,
+.summary-controls select {
+  min-height: 42px;
+}
+.portal-workspace .workspace-main .summary-search .button.primary {
+  background: #123b70;
+  border-color: #123b70;
+  color: #fff;
+}
+.portal-workspace .workspace-main .summary-search .button.primary:hover {
+  background: #0d2e59;
+}
+.summary-controls .muted,
+.summary-breakdowns .muted {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #566780;
+}
+.summary-detail {
+  margin-top: 24px;
+  padding: 24px;
+  border: 1px solid #e4eaf2;
+  border-radius: 12px;
+  background: #f8faff;
+}
+.summary-table td a {
+  display: block;
+  margin-top: 12px;
+}
+@media (max-width: 1100px) {
+  .summary-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .summary-breakdowns {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 600px) {
+  .summary-filters {
+    grid-template-columns: 1fr;
+  }
+  .summary-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

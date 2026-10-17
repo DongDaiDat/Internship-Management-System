@@ -346,6 +346,86 @@
 .student-contact-actions .button {
   min-height: 44px;
 }
+.student-history-link {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin: 24px 0;
+  padding: 16px;
+  border: 1px solid #dce5f2;
+  border-radius: 12px;
+  color: #123b70;
+  font-weight: 700;
+}
+.student-history-link span {
+  color: #52647d;
+  font-size: 14px;
+  font-weight: 500;
+}
+.student-history {
+  display: grid;
+  gap: 24px;
+}
+.student-history-intro h2 {
+  margin: 8px 0;
+}
+.student-history-intro p {
+  max-width: 720px;
+  color: #52647d;
+  line-height: 1.65;
+}
+.student-history-timeline {
+  display: grid;
+  gap: 16px;
+}
+.student-history-entry {
+  display: flex;
+  justify-content: space-between;
+  gap: 32px;
+  padding: 24px;
+  border-left: 4px solid #f58220;
+}
+.student-history-entry h3 {
+  margin: 10px 0 14px;
+  color: #172b4d;
+}
+.student-history-entry p {
+  margin: 8px 0;
+  color: #52647d;
+}
+.student-history-period,
+.student-history-result > span {
+  color: #9a4d08;
+  font-size: 13px;
+  font-weight: 700;
+}
+.student-history-result {
+  display: flex;
+  min-width: 150px;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 7px;
+  text-align: right;
+}
+.student-history-result strong {
+  color: #123b70;
+  font-size: 26px;
+}
+.student-history-result small {
+  color: #52647d;
+}
+.student-history-result a {
+  margin-top: 5px;
+  color: #123b70;
+  font-weight: 700;
+}
+.student-history-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+}
 .student-context-bar {
   display: flex;
   align-items: flex-end;
@@ -537,6 +617,20 @@
   .student-contact-actions {
     flex-direction: column;
     align-items: stretch;
+  }
+  .student-history-entry {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .student-history-result {
+    align-items: flex-start;
+    text-align: left;
+  }
+  .student-history-link,
+  .student-history-pagination {
+    align-items: flex-start;
+    flex-direction: column;
   }
   .student-report-layout {
     grid-template-columns: 1fr;

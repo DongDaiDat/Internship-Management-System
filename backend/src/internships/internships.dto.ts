@@ -61,6 +61,15 @@ export class CreatePeriodDto extends PeriodAcademicDto {
 }
 
 export class CreateApplicationDto {
+  @IsOptional() @IsUUID() proposedMentorId?: string;
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === "string" ? value.trim() : value,
+  )
+  @IsString()
+  @MinLength(10)
+  @MaxLength(500)
+  mentorReason?: string;
   @IsUUID() periodId!: string;
   @IsOptional() @IsUUID() companyId?: string;
   @IsString() @MinLength(2) @MaxLength(160) positionTitle!: string;

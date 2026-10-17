@@ -33,6 +33,8 @@ export class DashboardDetailsQueryDto extends DashboardQueryDto {
   @Type(() => Number) @IsInt() @Min(1) @Max(100000) page = 1;
 }
 export class FacultyWorkspaceQueryDto extends DashboardQueryDto {
+  @IsOptional() @IsUUID() applicationId?: string;
+  @IsOptional() @IsUUID() internshipId?: string;
   @IsOptional()
   @IsEnum(["approvals", "exceptions", "grades", "operations"])
   view?: string;

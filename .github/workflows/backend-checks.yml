@@ -49,3 +49,4 @@ jobs:
           docker run -d --name internship-ci-minio -p 127.0.0.1:9000:9000 -e MINIO_ROOT_USER -e MINIO_ROOT_PASSWORD minio/minio:latest server /data
           curl --fail --retry 15 --retry-connrefused --retry-delay 1 http://localhost:9000/minio/health/live
       - run: npm run test:integration
+      - run: npm run test:upgrade

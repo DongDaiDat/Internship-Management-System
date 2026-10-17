@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api";
+import { useSearchParams } from "next/navigation";
 type Application = {
   id: string;
   externalCompanyName: string;
@@ -10,6 +11,7 @@ type Application = {
   period: { name: string };
 };
 export function ExternalCompanyPanel() {
+  const applicationId = useSearchParams().get("applicationId");
   const [items, setItems] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -17,8 +19,12 @@ export function ExternalCompanyPanel() {
   const [notice, setNotice] = useState("");
   const load = useCallback(
     async () =>
-      setItems(await api<Application[]>("/external-company-applications")),
-    [],
+      setItems(
+        (await api<Application[]>("/external-company-applications")).filter(
+          (a) => !applicationId || a.id === applicationId,
+        ),
+      ),
+    [applicationId],
   );
   useEffect(() => {
     void load()

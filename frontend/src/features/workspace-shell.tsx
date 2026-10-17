@@ -40,6 +40,7 @@ export function WorkspaceShell({
   rolePicker,
   onNavigate,
   variant,
+  notifications,
 }: {
   children: ReactNode;
   title: string;
@@ -52,6 +53,7 @@ export function WorkspaceShell({
   rolePicker?: ReactNode;
   onNavigate?: (key: string) => void;
   variant?: "student";
+  notifications?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
@@ -177,6 +179,7 @@ export function WorkspaceShell({
                   </div>
                 )}
               </div>
+              {notifications}
               <span className="student-topbar-user">
                 <span className="avatar">
                   {name.trim().split(" ").at(-1)?.slice(0, 1)}

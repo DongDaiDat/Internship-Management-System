@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api";
+import { useSearchParams } from "next/navigation";
 import { FilePanel } from "./file-panel";
 
 type Internship = {
@@ -28,7 +29,10 @@ export function MentorPortal() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [search, setSearch] = useState("");
-  const [selectedId, setSelectedId] = useState("");
+  const params = useSearchParams();
+  const [selectedId, setSelectedId] = useState(
+    params.get("internshipId") || "",
+  );
   const [dirty, setDirty] = useState(false);
   const load = useCallback(async () => {
     const result = await api<{ internships: Internship[] }>(
@@ -188,7 +192,15 @@ export function MentorPortal() {
               max={item.period.weeklyReportCount}
             />
             {item.weeklyReports.map((report) => (
-              <details className="portal-entry" key={report.id}>
+              <details
+                className="portal-entry"
+                key={report.id}
+                open={
+                  params.get("week") === String(report.weekNumber)
+                    ? true
+                    : undefined
+                }
+              >
                 <summary>
                   Tuần {report.weekNumber} ·{" "}
                   {report.status === "Reviewed"

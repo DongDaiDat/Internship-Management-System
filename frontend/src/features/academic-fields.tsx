@@ -64,7 +64,11 @@ export function Choice({
         onChange={(e) => onChange(e.target.value)}
       >
         <option value="">
-          {required ? "Chọn " + label.toLowerCase() : label.toLowerCase().includes("chương trình") ? "Tất cả chương trình" : "Chưa chọn " + label.toLowerCase()}
+          {required
+            ? "Chọn " + label.toLowerCase()
+            : label.toLowerCase().includes("chương trình")
+              ? "Tất cả chương trình"
+              : "Chưa chọn " + label.toLowerCase()}
         </option>
         {items.map((x) => (
           <option key={x.id} value={x.id}>

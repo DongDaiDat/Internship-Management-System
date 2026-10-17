@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { FilePanel } from "./file-panel";
@@ -230,9 +231,11 @@ export function StudentHome({ data }: { data: StudentData }) {
 
 export function StudentProfile({
   profile,
+  completedInternships,
   onSaved,
 }: {
   profile: NonNullable<StudentData["profile"]>;
+  completedInternships: number;
   onSaved: () => Promise<void>;
 }) {
   const [busy, setBusy] = useState(false),
@@ -283,6 +286,10 @@ export function StudentProfile({
               </div>
             ))}
           </dl>
+          <Link className="student-history-link" href={root + "history"}>
+            Xem lịch sử thực tập
+            <span>{completedInternships} kỳ đã hoàn thành</span>
+          </Link>
           <form
             className="student-contact-form"
             onSubmit={async (e) => {
@@ -341,6 +348,137 @@ export function StudentProfile({
   );
 }
 
+type CompletedInternship = {
+  id: string;
+  period: { id: string; name: string };
+  academicYear: string | null;
+  semester: number | null;
+  company: { name: string } | null;
+  mentor: { name: string } | null;
+  finalGrade: { total: number; letterGrade: string } | null;
+};
+
+export function StudentInternshipHistory() {
+  const [data, setData] = useState<{
+    items: CompletedInternship[];
+    total: number;
+    page: number;
+    pageSize: number;
+  } | null>(null);
+  const [error, setError] = useState("");
+  const [page, setPage] = useState(1);
+  const [retry, setRetry] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    setError("");
+    setData(null);
+    api<NonNullable<typeof data>>(
+      `/reports/internships?status=completed&sort=newest&page=${page}&pageSize=10`,
+      { signal: controller.signal },
+    )
+      .then(setData)
+      .catch((cause: Error) => {
+        if (!controller.signal.aborted) setError(cause.message);
+      });
+    return () => controller.abort();
+  }, [page, retry]);
+  return (
+    <section className="student-history" aria-label="Lịch sử thực tập">
+      <section className="card student-history-intro">
+        <span className="eyebrow">LƯU TRỮ CÁ NHÂN</span>
+        <h2>Lịch sử thực tập</h2>
+        <p>
+          Các kỳ đã hoàn thành của bạn. Hồ sơ đang xử lý nằm tại Hồ sơ đăng ký;
+          công việc hiện tại nằm ở Tổng quan.
+        </p>
+      </section>
+      {error ? (
+        <p className="login-error" role="alert">
+          {error}{" "}
+          <button onClick={() => setRetry((current) => current + 1)}>
+            Thử lại
+          </button>
+        </p>
+      ) : !data ? (
+        <p className="empty-state" role="status">
+          Đang tải lịch sử thực tập…
+        </p>
+      ) : data.items.length ? (
+        <>
+          <div className="student-history-timeline">
+            {data.items.map((item) => (
+              <article className="card student-history-entry" key={item.id}>
+                <div>
+                  <span className="student-history-period">
+                    {item.period.name}
+                  </span>
+                  <h3>
+                    {item.academicYear || "Năm học chưa cập nhật"}
+                    {item.semester ? ` · Học kỳ ${item.semester}` : ""}
+                  </h3>
+                  <p>
+                    <strong>Doanh nghiệp:</strong>{" "}
+                    {item.company?.name || "Chưa cập nhật"}
+                  </p>
+                  <p>
+                    <strong>Giảng viên:</strong>{" "}
+                    {item.mentor?.name || "Chưa cập nhật"}
+                  </p>
+                </div>
+                <div className="student-history-result">
+                  <span>Đã hoàn thành</span>
+                  {item.finalGrade ? (
+                    <>
+                      <strong>{item.finalGrade.total}/10</strong>
+                      <small>{item.finalGrade.letterGrade}</small>
+                      <Link href={`${root}results?internshipId=${item.id}`}>
+                        Xem kết quả →
+                      </Link>
+                    </>
+                  ) : (
+                    <small>Kết quả chưa được công bố</small>
+                  )}
+                </div>
+              </article>
+            ))}
+          </div>
+          <nav
+            className="student-history-pagination"
+            aria-label="Phân trang lịch sử thực tập"
+          >
+            <button
+              className="button secondary"
+              disabled={data.page <= 1}
+              onClick={() => setPage((current) => current - 1)}
+            >
+              Trước
+            </button>
+            <span>
+              {data.total} kỳ · Trang {data.page} /{" "}
+              {Math.max(1, Math.ceil(data.total / data.pageSize))}
+            </span>
+            <button
+              className="button secondary"
+              disabled={data.page * data.pageSize >= data.total}
+              onClick={() => setPage((current) => current + 1)}
+            >
+              Sau
+            </button>
+          </nav>
+        </>
+      ) : (
+        <section className="card empty-state">
+          <h2>Chưa có kỳ thực tập đã hoàn thành</h2>
+          <p>Khi khoa chốt kết quả, kỳ thực tập sẽ xuất hiện tại đây.</p>
+          <Link className="button secondary" href={root + "overview"}>
+            Về tổng quan
+          </Link>
+        </section>
+      )}
+    </section>
+  );
+}
+
 type Mutation = (
   path: string,
   body: object,
@@ -361,15 +499,22 @@ export function StudentInternshipPanel({
   reload: () => Promise<void>;
   onDirtyChange: (dirty: boolean) => void;
 }) {
-  const [selected, setSelected] = useState<number | "final">(
-    () =>
-      item.weeklyReports.find((r) => r.status === "NeedsRevision")
-        ?.weekNumber ||
-      Array.from(
-        { length: item.period.weeklyReportCount },
-        (_, i) => i + 1,
-      ).find((w) => !item.weeklyReports.some((r) => r.weekNumber === w)) ||
-      1,
+  const params = useSearchParams();
+  const requestedWeek = Number(params.get("week"));
+  const [selected, setSelected] = useState<number | "final">(() =>
+    params.get("section") === "final"
+      ? "final"
+      : Number.isInteger(requestedWeek) &&
+          requestedWeek >= 1 &&
+          requestedWeek <= item.period.weeklyReportCount
+        ? requestedWeek
+        : item.weeklyReports.find((r) => r.status === "NeedsRevision")
+            ?.weekNumber ||
+          Array.from(
+            { length: item.period.weeklyReportCount },
+            (_, i) => i + 1,
+          ).find((w) => !item.weeklyReports.some((r) => r.weekNumber === w)) ||
+          1,
   );
   const [dirty, setDirty] = useState(false);
   useEffect(() => {
@@ -606,6 +751,7 @@ export function StudentInternshipPanel({
                 Nội dung công việc và kết quả
                 <textarea
                   name="content"
+                  disabled={busy}
                   defaultValue={content || ""}
                   onChange={() => setDirty(true)}
                   minLength={selected === "final" ? 100 : 20}

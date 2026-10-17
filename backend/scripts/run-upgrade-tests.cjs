@@ -20,7 +20,13 @@ async function main() {
   };
   for (const args of [
     [require.resolve("prisma/build/index.js"), "migrate", "deploy"],
-    ["--test", "test/upgrade.integration.test.cjs"],
+    [
+      "--test",
+      "--test-concurrency=1",
+      "test/upgrade.integration.test.cjs",
+      "test/mentor-requests.integration.test.cjs",
+      "test/summary.integration.test.cjs",
+    ],
   ]) {
     const child = spawnSync(process.execPath, args, { env, stdio: "inherit" });
     if (child.status) process.exit(child.status);

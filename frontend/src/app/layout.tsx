@@ -3,6 +3,7 @@ import "./globals.css";
 import "./workspace.css";
 import "./student-workspace.css";
 import "./desktop-workspace.css";
+import "./notifications.css";
 
 export const metadata: Metadata = {
   title: "Quản lý thực tập tốt nghiệp",

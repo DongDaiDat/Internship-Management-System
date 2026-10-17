@@ -34,7 +34,15 @@ export class ApiError extends Error {
 }
 export function workspaceHeaders(): Record<string, string> {
   if (typeof window === "undefined") return {};
-  const roles: Record<string, string> = { admin: "Admin", coordinator: "InternshipCoordinator", faculty: "FacultyManager", student: "Student", mentor: "FacultyMentor", company: "Company", supervisor: "CompanySupervisor" };
+  const roles: Record<string, string> = {
+    admin: "Admin",
+    coordinator: "InternshipCoordinator",
+    faculty: "FacultyManager",
+    student: "Student",
+    mentor: "FacultyMentor",
+    company: "Company",
+    supervisor: "CompanySupervisor",
+  };
   const role = roles[window.location.pathname.split("/")[2]];
   return role ? { "X-Workspace-Role": role } : {};
 }
@@ -95,5 +103,12 @@ export async function api<T>(
       response.status,
     );
   }
+  if (
+    typeof window !== "undefined" &&
+    options.method &&
+    !["GET", "HEAD"].includes(options.method.toUpperCase()) &&
+    !path.startsWith("/auth/")
+  )
+    window.dispatchEvent(new Event("workspace-mutated"));
   return response.status === 204 ? (undefined as T) : response.json();
 }

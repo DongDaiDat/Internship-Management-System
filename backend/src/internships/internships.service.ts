@@ -1,3 +1,10 @@
+import { recordAssignment, closeAssignments } from "./assignment-history";
+import {
+  MentorRequestsService,
+  mentorHistory,
+  mentorLoadWhere,
+  activeMentorAccount,
+} from "./mentor-requests.service";
 import {
   AcademicService,
   academicInclude,
@@ -91,6 +98,7 @@ export class InternshipsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly academic: AcademicService,
+    private readonly mentorRequests: MentorRequestsService,
   ) {}
 
   private require(user: AuthUser, ...roles: Role[]) {
@@ -1009,7 +1017,9 @@ export class InternshipsService {
     if (batch.createdById !== user.id)
       throw new ForbiddenException("Chỉ được xác nhận file do mình kiểm tra.");
     if (batch.departmentId !== staffDepartment(user))
-      throw new ForbiddenException("Lô import không thuộc khoa hiện tại. Hãy tải lại tệp để kiểm tra trong đúng khoa.");
+      throw new ForbiddenException(
+        "Lô import không thuộc khoa hiện tại. Hãy tải lại tệp để kiểm tra trong đúng khoa.",
+      );
     const rows = batch.rows as unknown as ImportRow[];
     if (batch.type === ImportType.Students)
       for (const row of rows)
@@ -1177,19 +1187,51 @@ export class InternshipsService {
         "Sinh viên đã có một thực tập đang hiệu lực.",
       );
     const reason = this.eligibility(student, period.creditThresholdPercent);
-    const application = await this.prisma.internshipApplication.create({
-      data: {
-        ...dto,
-        studentId: student.id,
-        eligibilityPassed: !reason,
-        eligibilityReason: reason,
-        status: ApplicationStatus.Submitted,
-        submittedAt: now,
-      },
+    const { proposedMentorId, mentorReason, ...details } = dto;
+    if (!!proposedMentorId !== !!mentorReason)
+      throw new BadRequestException(
+        "Chọn giảng viên và nhập lý do đề xuất 10–500 ký tự.",
+      );
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "StudentProfile" WHERE "id" = ${student.id}::uuid FOR UPDATE`;
+      const existing = await tx.internshipApplication.findUnique({
+        where: {
+          periodId_studentId: { periodId: dto.periodId, studentId: student.id },
+        },
+      });
+      if (existing)
+        throw new ConflictException(
+          "Bạn đã gửi hồ sơ cho đợt này. Mở Hồ sơ đăng ký để xem hoặc sửa đề xuất.",
+        );
+      const application = await tx.internshipApplication.create({
+        data: {
+          ...details,
+          studentId: student.id,
+          eligibilityPassed: !reason,
+          eligibilityReason: reason,
+          status: ApplicationStatus.Submitted,
+          submittedAt: now,
+        },
+      });
+      if (proposedMentorId && mentorReason)
+        await this.mentorRequests.create(
+          tx,
+          application.id,
+          period.departmentId,
+          { facultyMentorId: proposedMentorId, reason: mentorReason },
+          user.id,
+        );
+      await tx.auditLog.create({
+        data: {
+          actorId: user.id,
+          action: "application.submit",
+          targetId: application.id,
+        },
+      });
+      return application;
     });
-    await this.audit(user.id, "application.submit", application.id);
-    return application;
   }
+
   async cancelApplication(id: string, user: AuthUser) {
     this.require(user, Role.Student);
     const student = await this.studentFor(user.id);
@@ -1214,6 +1256,7 @@ export class InternshipsService {
     )
       throw new BadRequestException("Chỉ được hủy trong thời gian đăng ký.");
     await this.prisma.$transaction(async (tx) => {
+      await this.mentorRequests.lock(tx, id);
       const changed = await tx.internshipApplication.updateMany({
         where: {
           id,
@@ -1232,6 +1275,7 @@ export class InternshipsService {
         throw new ConflictException(
           "Trạng thái hồ sơ đã thay đổi. Không thể hủy.",
         );
+      await this.mentorRequests.close(tx, id, "Cancelled");
       await tx.auditLog.create({
         data: { actorId: user.id, action: "application.cancel", targetId: id },
       });
@@ -1300,6 +1344,7 @@ export class InternshipsService {
   ) {
     this.approve(user);
     return this.prisma.$transaction(async (tx) => {
+      await this.mentorRequests.lock(tx, id);
       const application = await tx.internshipApplication.findUnique({
         where: { id },
         include: {
@@ -1348,7 +1393,10 @@ export class InternshipsService {
         throw new ForbiddenException(
           "Sinh viên không thuộc đối tượng của đợt.",
         );
-      if (!company?.isVerified || company.departmentId !== application.period.departmentId)
+      if (
+        !company?.isVerified ||
+        company.departmentId !== application.period.departmentId
+      )
         throw new BadRequestException("Doanh nghiệp chưa được xác minh.");
       const academicEligible =
         !student.hasMandatoryCourseDebt &&
@@ -1373,16 +1421,25 @@ export class InternshipsService {
       )
         throw new ConflictException("Sinh viên đã có thực tập hiệu lực.");
       await tx.$queryRaw`SELECT "id" FROM "FacultyProfile" WHERE "id" = ${dto.facultyMentorId}::uuid FOR UPDATE`;
-      const mentor = await tx.facultyProfile.findUnique({
-        where: { id: dto.facultyMentorId },
+      const mentor = await this.mentorRequests.eligible(
+        tx,
+        dto.facultyMentorId,
+        staffDepartment(user),
+      );
+      const requests = await tx.mentorRequest.findMany({
+        where: { applicationId: id },
       });
-      if (!mentor?.isActive || mentor.departmentId !== staffDepartment(user))
-        throw new BadRequestException("Giảng viên hướng dẫn không hợp lệ.");
-      const count = await tx.internship.count({
-        where: { facultyMentorId: mentor.id, endsAt: { gte: new Date() } },
-      });
-      if (count >= mentor.maxStudents)
-        throw new ConflictException("Giảng viên đã đủ giới hạn hướng dẫn.");
+      const currentRequest = requests.find((r) => !r.closedAt);
+      const requiresReason =
+        (currentRequest?.response === "Accepted" &&
+          currentRequest.facultyMentorId !== mentor.id) ||
+        requests.some(
+          (r) => r.facultyMentorId === mentor.id && r.response === "Declined",
+        );
+      if (requiresReason && (!dto.note || dto.note.trim().length < 10))
+        throw new BadRequestException(
+          "Cần ghi lý do phân công 10–500 ký tự khi thay đổi nguyện vọng đã được đồng ý hoặc chọn giảng viên đã từ chối.",
+        );
       const snapshot = {
         departmentId: student.departmentId,
         majorId: student.majorId,
@@ -1424,11 +1481,42 @@ export class InternshipsService {
           endsAt: application.period.endsAt,
         },
       });
+      await recordAssignment(
+        tx,
+        internship.id,
+        "mentor",
+        mentor.id,
+        mentor.fullName,
+        application.companyId,
+        user.id,
+        "Approval",
+      );
+      if (application.companyId) {
+        const company = await tx.companyProfile.findUniqueOrThrow({
+          where: { id: application.companyId },
+        });
+        await recordAssignment(
+          tx,
+          internship.id,
+          "company",
+          company.id,
+          company.name,
+          company.id,
+          user.id,
+          "Approval",
+        );
+      }
+      await this.mentorRequests.close(tx, id, "Assigned");
       await tx.auditLog.create({
         data: {
           actorId: user.id,
           action: "application.approve",
           targetId: internship.id,
+          reason: dto.note,
+          details: {
+            facultyMentorId: mentor.id,
+            mentorRequestId: currentRequest?.id ?? null,
+          },
         },
       });
       return internship;
@@ -1563,6 +1651,19 @@ export class InternshipsService {
       const current = await this.withinChangeWindow(internshipId, tx);
       if (current.companyId !== company.id)
         throw new ForbiddenException("Công ty của sinh viên đã thay đổi.");
+      const supervisorUser = await tx.user.findUniqueOrThrow({
+        where: { id: supervisor.userId },
+      });
+      await recordAssignment(
+        tx,
+        internshipId,
+        "supervisor",
+        supervisor.id,
+        supervisorUser.fullName,
+        company.id,
+        user.id,
+        "Assignment",
+      );
       await tx.companySupervisorAssignment.upsert({
         where: {
           internshipId_supervisorId: {
@@ -1634,6 +1735,37 @@ export class InternshipsService {
           ),
         },
       });
+      await closeAssignments(
+        tx,
+        internshipId,
+        ["company", "supervisor", "mentor"],
+        dto.reason,
+      );
+      await recordAssignment(
+        tx,
+        internshipId,
+        "company",
+        company.id,
+        company.name,
+        company.id,
+        user.id,
+        "Change",
+        dto.reason,
+      );
+      const currentMentor = await tx.facultyProfile.findUniqueOrThrow({
+        where: { id: current.facultyMentorId },
+      });
+      await recordAssignment(
+        tx,
+        internshipId,
+        "mentor",
+        currentMentor.id,
+        currentMentor.fullName,
+        company.id,
+        user.id,
+        "Change",
+        dto.reason,
+      );
       await tx.supervisorEvaluation.deleteMany({ where: { internshipId } });
       await tx.facultyEvaluation.deleteMany({ where: { internshipId } });
       await tx.companySupervisorAssignment.deleteMany({
@@ -1662,24 +1794,28 @@ export class InternshipsService {
       if (current.facultyMentorId === dto.facultyMentorId)
         throw new ConflictException("Giảng viên này đang hướng dẫn sinh viên.");
       await tx.$queryRaw`SELECT "id" FROM "FacultyProfile" WHERE "id" = ${dto.facultyMentorId}::uuid FOR UPDATE`;
-      const mentor = await tx.facultyProfile.findUnique({
-        where: { id: dto.facultyMentorId },
-      });
-      if (!mentor?.isActive || mentor.departmentId !== staffDepartment(user))
-        throw new BadRequestException("Giảng viên không hợp lệ.");
-      const count = await tx.internship.count({
-        where: {
-          facultyMentorId: mentor.id,
-          id: { not: internshipId },
-          endsAt: { gte: new Date() },
-        },
-      });
-      if (count >= mentor.maxStudents)
-        throw new ConflictException("Giảng viên đã đủ giới hạn hướng dẫn.");
+      const mentor = await this.mentorRequests.eligible(
+        tx,
+        dto.facultyMentorId,
+        staffDepartment(user),
+        internshipId,
+      );
       const previous = await tx.internship.findUniqueOrThrow({
         where: { id: internshipId },
         include: { facultyEvaluation: true, finalReport: true },
       });
+      await closeAssignments(tx, internshipId, ["mentor"], dto.reason);
+      await recordAssignment(
+        tx,
+        internshipId,
+        "mentor",
+        mentor.id,
+        mentor.fullName,
+        current.companyId,
+        user.id,
+        "Change",
+        dto.reason,
+      );
       await tx.internship.update({
         where: { id: internshipId },
         data: { facultyMentorId: mentor.id },
@@ -2112,6 +2248,12 @@ export class InternshipsService {
           },
         },
       });
+      await closeAssignments(
+        tx,
+        internshipId,
+        ["mentor", "company", "supervisor"],
+        "Hoàn thành và chốt điểm thực tập",
+      );
       await tx.auditLog.create({
         data: { actorId: user.id, action: "grade.lock", targetId: grade.id },
       });
@@ -2153,6 +2295,10 @@ export class InternshipsService {
             id: true,
             status: true,
             submittedAt: true,
+            mentorRequests: mentorHistory,
+            internship: {
+              select: { facultyMentor: { select: { fullName: true } } },
+            },
             eligibilityPassed: true,
             student: {
               select: {
@@ -3000,6 +3146,7 @@ export class InternshipsService {
   async rejectApplication(id: string, dto: ReviewExceptionDto, user: AuthUser) {
     this.approve(user);
     return this.prisma.$transaction(async (tx) => {
+      await this.mentorRequests.lock(tx, id);
       const changed = await tx.internshipApplication.updateMany({
         where: {
           id,
@@ -3014,6 +3161,7 @@ export class InternshipsService {
       });
       if (changed.count !== 1)
         throw new ConflictException("Hồ sơ không còn chờ phê duyệt.");
+      await this.mentorRequests.close(tx, id, "Rejected");
       await tx.auditLog.create({
         data: {
           actorId: user.id,
@@ -3048,6 +3196,7 @@ export class InternshipsService {
           where: {
             status: ApplicationStatus.Submitted,
             period: scope,
+            ...(query.applicationId ? { id: query.applicationId } : {}),
             ...(query.view === "exceptions"
               ? { exceptionRequest: { status: ExceptionStatus.Pending } }
               : {}),
@@ -3064,13 +3213,25 @@ export class InternshipsService {
               },
             },
             company: { select: { name: true, isVerified: true } },
-            period: { select: { name: true } },
+            period: {
+              select: {
+                name: true,
+                status: true,
+                registrationEndsAt: true,
+                endsAt: true,
+              },
+            },
             exceptionRequest: true,
+            mentorRequests: mentorHistory,
           },
           orderBy: [{ submittedAt: "asc" }, { id: "asc" }],
         }),
         this.prisma.facultyProfile.findMany({
-          where: { isActive: true, departmentId: staffDepartment(user) },
+          where: {
+            isActive: true,
+            departmentId: staffDepartment(user),
+            user: activeMentorAccount,
+          },
           select: {
             id: true,
             fullName: true,
@@ -3078,7 +3239,7 @@ export class InternshipsService {
             _count: {
               select: {
                 supervisedInternships: {
-                  where: { endsAt: { gte: new Date() } },
+                  where: mentorLoadWhere(),
                 },
               },
             },
@@ -3086,7 +3247,10 @@ export class InternshipsService {
           orderBy: { fullName: "asc" },
         }),
         this.prisma.internship.findMany({
-          where: { period: scope },
+          where: {
+            period: scope,
+            ...(query.internshipId ? { id: query.internshipId } : {}),
+          },
           skip: (query.internshipPage - 1) * 20,
           take: 20,
           select: {
@@ -3123,12 +3287,18 @@ export class InternshipsService {
           where: {
             status: ApplicationStatus.Submitted,
             period: scope,
+            ...(query.applicationId ? { id: query.applicationId } : {}),
             ...(query.view === "exceptions"
               ? { exceptionRequest: { status: ExceptionStatus.Pending } }
               : {}),
           },
         }),
-        this.prisma.internship.count({ where: { period: scope } }),
+        this.prisma.internship.count({
+          where: {
+            period: scope,
+            ...(query.internshipId ? { id: query.internshipId } : {}),
+          },
+        }),
       ],
       { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
     );
@@ -3241,7 +3411,15 @@ export class InternshipsService {
         }),
         this.prisma.internshipApplication.findMany({
           where: { studentId: profile.id },
-          include: { period: true, company: true, exceptionRequest: true },
+          include: {
+            period: true,
+            company: true,
+            exceptionRequest: true,
+            mentorRequests: mentorHistory,
+            internship: {
+              select: { facultyMentor: { select: { fullName: true } } },
+            },
+          },
           orderBy: { createdAt: "desc" },
         }),
       ]);

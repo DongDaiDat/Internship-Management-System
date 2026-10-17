@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api";
+import { useSearchParams } from "next/navigation";
 import { FilePanel } from "./file-panel";
 
 type Evaluation = {
@@ -43,7 +44,10 @@ export function CompanyPortal() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
-  const [selectedId, setSelectedId] = useState("");
+  const params = useSearchParams();
+  const [selectedId, setSelectedId] = useState(
+    params.get("internshipId") || "",
+  );
   const [dirty, setDirty] = useState(false);
   const [credential, setCredential] = useState<{
     email: string;

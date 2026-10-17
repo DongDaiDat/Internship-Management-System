@@ -13,7 +13,14 @@ const db = fixture.db;
 const {
   AcademicService,
 } = require("../.test-build/internships/academic.service");
-const service = new InternshipsService(db, new AcademicService(db));
+const {
+  MentorRequestsService,
+} = require("../.test-build/internships/mentor-requests.service");
+const service = new InternshipsService(
+  db,
+  new AcademicService(db),
+  new MentorRequestsService(db),
+);
 const {
   FilesService,
   MAX_PDF_BYTES,

@@ -46,9 +46,13 @@ async function main() {
     join(__dirname, "../.local/qa-report.pdf"),
     await sample.save(),
   );
-  if (existsSync(existingPath)) {
+  if (existsSync(existingPath) && process.env.QA_FRESH !== "true") {
     const prior = JSON.parse(readFileSync(existingPath, "utf8"));
-    if (await db.internship.findUnique({ where: { id: prior.internshipId } })) {
+    if (
+      prior.version === 2 &&
+      (await db.internship.findUnique({ where: { id: prior.internshipId } }))
+    ) {
+      await require("./seed-reporting-history.cjs").seedReportingHistory(db);
       await db.$disconnect();
       if (process.env.QA_SEED_ONLY === "true") {
         console.log("QA fixtures ready; no HTTP server started.");
@@ -64,6 +68,30 @@ async function main() {
   const suffix = randomUUID().slice(0, 8),
     password = randomUUID() + randomUUID();
   const passwordHash = await hashPassword(password);
+  const { seedAcademic } = require("./seed-academic.cjs");
+  await seedAcademic(db);
+  const department = await db.department.create({
+    data: { code: `QA-${suffix}`, name: `Khoa QA ${suffix}` },
+  });
+  const departmentId = department.id;
+  const program = await db.trainingProgram.findUniqueOrThrow({
+    where: { code: "ICT1" },
+  });
+  const cohort = await db.cohort.findUniqueOrThrow({ where: { code: "K17" } });
+  await db.departmentProgram.create({
+    data: {
+      departmentId,
+      programId: program.id,
+      confirmed: true,
+      source: "https://example.test/qa",
+    },
+  });
+  const academic = {
+    departmentId,
+    majorId: program.majorId,
+    programId: program.id,
+    cohortId: cohort.id,
+  };
   const users = {};
   for (const role of [
     "Admin",
@@ -79,6 +107,7 @@ async function main() {
         email: `qa-${role.toLowerCase()}-${suffix}@example.test`,
         fullName: `QA ${role}`,
         passwordHash,
+        departmentId: role === "Admin" ? null : departmentId,
         roles: { create: { role } },
       },
     });
@@ -86,6 +115,7 @@ async function main() {
   const student = await db.studentProfile.create({
     data: {
       studentCode: `QA-${suffix}`,
+      ...academic,
       fullName: "Sinh viên kiểm thử",
       email: users.Student.email,
       className: "CNTT QA",
@@ -99,6 +129,7 @@ async function main() {
   const mentor = await db.facultyProfile.create({
     data: {
       facultyCode: `QA-${suffix}`,
+      departmentId,
       fullName: "Giảng viên kiểm thử",
       email: users.FacultyMentor.email,
       expertise: "CNTT",
@@ -108,6 +139,7 @@ async function main() {
   const company = await db.companyProfile.create({
     data: {
       name: `Doanh nghiệp QA ${suffix}`,
+      departmentId,
       address: "Dữ liệu kiểm thử",
       contactName: "Đại diện QA",
       contactEmail: users.Company.email,
@@ -128,6 +160,11 @@ async function main() {
   const period = await db.internshipPeriod.create({
     data: {
       name: `Đợt QA ${suffix}`,
+      departmentId,
+      roundNumber: 1,
+      semester: 1,
+      academicYear: `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`,
+      audience: { create: { majorId: program.majorId, cohortId: cohort.id } },
       coordinatorId: users.InternshipCoordinator.id,
       registrationStartsAt: new Date(now - 10 * day),
       registrationEndsAt: new Date(now - 2 * day),
@@ -172,6 +209,12 @@ async function main() {
     existingPath,
     JSON.stringify(
       {
+        version: 2,
+        academic,
+        mentorId: mentor.id,
+        companyId: company.id,
+        supervisorId: supervisor.id,
+        periodId: period.id,
         password,
         accounts: Object.fromEntries(
           Object.entries(users).map(([role, user]) => [role, user.email]),
@@ -184,6 +227,7 @@ async function main() {
     ),
     { mode: 0o600 },
   );
+  await require("./seed-reporting-history.cjs").seedReportingHistory(db);
   await db.$disconnect();
   if (process.env.QA_SEED_ONLY === "true") {
     console.log("QA fixtures created; no HTTP server started.");

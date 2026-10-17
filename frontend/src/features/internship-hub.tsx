@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import {
   api,
   ApiError,
@@ -700,6 +700,8 @@ function PublishPeriod({
   );
 }
 export function ImportPanel({ onConfirmed }: { onConfirmed: () => void }) {
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [notice, setNotice] = useState("");
   const [type, setType] = useState<ImportType>("Students");
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<{
@@ -715,6 +717,7 @@ export function ImportPanel({ onConfirmed }: { onConfirmed: () => void }) {
     if (!file) return;
     setBusy(true);
     setError("");
+    setNotice("");
     try {
       const body = new FormData();
       body.append("file", file);
@@ -742,10 +745,15 @@ export function ImportPanel({ onConfirmed }: { onConfirmed: () => void }) {
   async function confirm() {
     if (!preview || preview.errors.length) return;
     setBusy(true);
+    setError("");
     try {
       await api(`/imports/${preview.batchId}/confirm`, { method: "POST" });
+      setNotice(
+        `Đã import ${preview.valid} hồ sơ. Mở mục Hồ sơ học vụ để kiểm tra và xác minh trước khi Admin cấp tài khoản.`,
+      );
       setPreview(null);
       setFile(null);
+      if (fileInput.current) fileInput.current.value = "";
       onConfirmed();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Không thể import.");
@@ -757,15 +765,23 @@ export function ImportPanel({ onConfirmed }: { onConfirmed: () => void }) {
     <section className="card editor import-panel">
       <h2>Import hồ sơ Excel</h2>
       <p>File chỉ tạo hồ sơ, không tự cấp tài khoản.</p>
+      {notice && (
+        <p className="notice" role="status">
+          {notice}
+        </p>
+      )}
       <form onSubmit={upload}>
         <div className="form-row">
           <label>
             Loại hồ sơ
             <select
               value={type}
+              disabled={busy}
               onChange={(event) => {
                 setType(event.target.value as ImportType);
                 setPreview(null);
+                setNotice("");
+                setError("");
               }}
             >
               <option value="Students">Sinh viên</option>
@@ -777,11 +793,14 @@ export function ImportPanel({ onConfirmed }: { onConfirmed: () => void }) {
             File .xlsx
             <input
               type="file"
+              ref={fileInput}
+              disabled={busy}
               accept=".xlsx"
               required
               onChange={(event) => {
                 setFile(event.target.files?.[0] || null);
                 setPreview(null);
+                setNotice("");
               }}
             />
           </label>
@@ -794,7 +813,7 @@ export function ImportPanel({ onConfirmed }: { onConfirmed: () => void }) {
             {error}
           </p>
         )}
-        <button className="button secondary" disabled={busy}>
+        <button className="button secondary" disabled={busy || !file}>
           {busy ? "Đang kiểm tra…" : "Kiểm tra file"}
         </button>
       </form>

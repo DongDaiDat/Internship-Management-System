@@ -152,6 +152,7 @@ model StudentProfile {
 }
 
 model FacultyProfile {
+  mentorRequests MentorRequest[]
   departmentId String? @db.Uuid
   department Department? @relation(fields: [departmentId], references: [id], onDelete: Restrict)
   importBatchId String? @db.Uuid
@@ -240,6 +241,7 @@ model InternshipPeriod {
 }
 
 model InternshipApplication {
+  mentorRequests MentorRequest[]
   id                String            @id @default(uuid()) @db.Uuid
   periodId          String            @db.Uuid
   studentId         String            @db.Uuid
@@ -266,6 +268,30 @@ model InternshipApplication {
   @@index([status, periodId])
 }
 
+enum MentorResponse {
+  Pending
+  Accepted
+  Declined
+}
+
+model MentorRequest {
+  id String @id @default(uuid()) @db.Uuid
+  applicationId String @db.Uuid
+  facultyMentorId String @db.Uuid
+  reason String @db.VarChar(500)
+  response MentorResponse @default(Pending)
+  responseNote String? @db.VarChar(500)
+  respondedById String? @db.Uuid
+  respondedAt DateTime?
+  closedAt DateTime?
+  closeReason String? @db.VarChar(40)
+  createdAt DateTime @default(now())
+  application InternshipApplication @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  facultyMentor FacultyProfile @relation(fields: [facultyMentorId], references: [id], onDelete: Restrict)
+  @@index([facultyMentorId, response, createdAt])
+  @@index([applicationId, createdAt])
+}
+
 model EligibilityExceptionRequest {
   id            String          @id @default(uuid()) @db.Uuid
   applicationId String          @unique @db.Uuid
@@ -281,6 +307,7 @@ model EligibilityExceptionRequest {
 }
 
 model Internship {
+  assignmentHistory AssignmentHistory[]
   id                         String   @id @default(uuid()) @db.Uuid
   applicationId              String   @unique @db.Uuid
   periodId                   String   @db.Uuid
@@ -493,4 +520,22 @@ model PeriodAudience {
   cohort Cohort @relation(fields: [cohortId], references: [id], onDelete: Restrict)
   program TrainingProgram? @relation(fields: [programId], references: [id], onDelete: Restrict)
   @@index([periodId])
+}
+
+model AssignmentHistory {
+  id String @id @default(uuid()) @db.Uuid
+  internshipId String @db.Uuid
+  internship Internship @relation(fields: [internshipId], references: [id], onDelete: Cascade)
+  kind String @db.VarChar(16)
+  targetId String @db.Uuid
+  targetName String @db.VarChar(160)
+  companyId String? @db.Uuid
+  assignedById String? @db.Uuid
+  startedAt DateTime @default(now())
+  endedAt DateTime?
+  reason String? @db.VarChar(1000)
+  source String @db.VarChar(30)
+  snapshot Json?
+  @@index([kind, targetId, endedAt])
+  @@index([internshipId, startedAt])
 }

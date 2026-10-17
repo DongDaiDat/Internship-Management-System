@@ -14,6 +14,28 @@ function run(command, args, environment = {}) {
 }
 const compose = ["compose", "-f", "docker-compose.e2e.yml"];
 const built = process.env.QA_BUILT === "true";
+// Existing named module volumes do not refresh when an image is rebuilt.
+run("docker", [...compose, "stop", "backend", "frontend"]);
+run("docker", [...compose, "build"]);
+run("docker", [
+  ...compose,
+  "run",
+  "--rm",
+  "--no-deps",
+  "backend",
+  "sh",
+  "-c",
+  "npm ci && npx prisma generate && npm run build:test",
+]);
+run("docker", [
+  ...compose,
+  "run",
+  "--rm",
+  "--no-deps",
+  "frontend",
+  "npm",
+  "ci",
+]);
 function fixture(script, extra = []) {
   run("docker", [
     ...compose,
@@ -50,19 +72,27 @@ run("docker", [
   ...(built ? ["-f", "docker-compose.e2e-built.yml"] : []),
   "up",
   "-d",
-  "--no-build",
+  "--build",
+  "--wait",
+]);
+fixture("scripts/serve-qa.cjs", [
+  "-e",
+  "QA_SEED_ONLY=true",
+  "-e",
+  "QA_FRESH=true",
+  "-e",
+  `QA_FIXTURE_NAME=${built ? "qa-sprint5-built" : "qa-sprint4"}`,
 ]);
 fixture("scripts/prepare-sprint4-import.cjs");
-run(process.execPath, ["frontend/tests/sprint4-roles.cjs"]);
-run(process.execPath, ["frontend/tests/sprint4-onboarding.cjs"]);
-run(process.execPath, ["frontend/tests/sprint4-import.cjs"]);
-fixture("scripts/seed-sprint4-flow.cjs");
-run(process.execPath, ["frontend/tests/sprint4-workflow.cjs"]);
-run(process.execPath, ["frontend/tests/sprint2-browser.cjs"], {
-  QA_FIXTURE_NAME: "qa-sprint4-flow",
-});
-run(process.execPath, ["frontend/tests/sprint3-browser.cjs"], {
-  QA_FIXTURE_NAME: "qa-sprint4-flow",
+run(process.execPath, ["frontend/tests/current-workflow.cjs"]);
+run(process.execPath, ["frontend/tests/summary-browser.cjs"]);
+run(process.execPath, ["frontend/tests/notifications-browser.cjs"]);
+run(process.execPath, ["frontend/tests/upgrade-account-browser.cjs"], {
+  UPGRADE_BASE_URL: "http://localhost:3200",
+  UPGRADE_FIXTURE: path.join(
+    root,
+    `backend/.local/${built ? "qa-sprint5-built" : "qa-sprint4"}.json`,
+  ),
 });
 console.log(
   `PASS ${built ? "built release" : "development"} seven-actor browser suite. QA data retained; stop with docker compose -f docker-compose.e2e.yml stop.`,

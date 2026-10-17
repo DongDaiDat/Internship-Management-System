@@ -1,5 +1,19 @@
 # Kiểm thử dự án
 
+## Kiểm thử đề xuất giảng viên (12/10/2026)
+
+Xem [quy trình, API và dữ liệu demo](MENTOR_REQUESTS.md). `npm run test:upgrade` nay chạy thêm sáu nhóm kiểm thử đề xuất/phân công, gồm truy cập sai khoa và tranh chỉ tiêu cuối. Bộ `test:e2e` bao gồm trang giảng viên `requests`, sinh viên đề xuất → giảng viên đồng ý → Trưởng khoa duyệt, và ảnh desktop 1440/1024 px.
+
+Kết quả ngày 12/10: 14 unit + 52 integration + 12 upgrade integration backend; 11 frontend test đạt. Typecheck, lint, format, build backend/frontend đạt. E2E production qua 28 trang/bảy vai trò, luồng đề xuất đến chốt điểm và tạo tài khoản thủ công; ảnh desktop 1440/1024 được rà soát.
+
+## Kiểm thử hiện tại — 08/10/2026
+
+Chạy `npm run test:e2e` tại `frontend/` (Docker Desktop và Chrome). Runner xây dựng môi trường QA riêng, đồng bộ dependencies, tạo khoa/tài khoản mới, import Excel, cấp tài khoản đúng vai trò, đổi mật khẩu, đăng ký/duyệt đúng hạn, nộp báo cáo/PDF, chấm và khóa điểm. Dùng `QA_BUILT=true` để chạy cùng bộ kiểm thử trên release images. `test:sprint4` và `test:sprint4:all` là alias tương thích của runner này.
+
+Các script `sprint2-browser`, `sprint3-browser`, `sprint4-roles/onboarding/import/workflow` được giữ làm lịch sử; chúng dùng giao diện/quyền cũ và không còn nằm trong runner hoặc npm scripts hiện tại. Kết quả Sprint cũ bên dưới không thay thế kiểm thử phiên bản hiện tại.
+
+Chi tiết phát hiện, bản sửa và giới hạn kiểm tra: [RETEST_2026_10_08.md](RETEST_2026_10_08.md).
+
 ## Sprint 5 — nghiệm thu 15/09/2026
 
 Lượt cuối: 52/52 integration + 14/14 unit backend, 11/11 test logic frontend, format/lint/typecheck/build PASS. E2E tổng hợp bảy actor PASS trên development **và release images** bằng `QA_BUILT=true`; hướng dẫn/lệnh trong [biên bản Sprint 5](SPRINT_5_ACCEPTANCE.md). Đã xác minh khôi phục 22 bảng/14 PDF và quyền HTTP sau restore, startup database trống/migration nâng cấp, restart release. Workflow GitHub có cả built E2E nhưng chưa có remote run. Không suy diễn các kết quả local thành pentest/load test hoặc production Internet.
@@ -122,6 +136,22 @@ Script đọc file tài khoản local vào bộ nhớ, không in mật khẩu ho
 Đã xem giao diện desktop và mobile 390px; không tràn ngang. Đã kiểm tra hiện/ẩn mật khẩu, thông báo sai thông tin, giữ email khi lỗi, điều hướng giữa đăng nhập và /demo. Đăng nhập thành công và quyền 2 role được kiểm tra qua HTTP proxy; chưa thực hiện toàn bộ thao tác thành công của form quản trị trong trình duyệt. Cần bổ sung E2E trình duyệt cho tạo tài khoản, đổi vai trò và hết hạn phiên trước khi tuyên bố hoàn thiện sản phẩm.
 
 Frontend đã PASS format/lint/typecheck, 8 test báo cáo và production build. Backend đã PASS lint/typecheck, 3 unit tests và 15 integration tests. Docker chạy được, migration không còn pending, 2 tài khoản local đã seed thành công. Workflow CI frontend/backend đã được thêm nhưng chưa chạy trên GitHub trong phiên này.
+# Cập nhật kiểm thử nhắc việc ngày 16/10/2026
+
+- API nhắc việc: 5 tình huống mới trong bộ tích hợp nâng cấp, kiểm tra mốc 72 giờ/24 giờ/quá hạn, lọc-phân trang, chuyển trách nhiệm khi nộp và nhận xét, nhiều người hướng dẫn doanh nghiệp, hủy hồ sơ, đổi giảng viên và đổi điều phối viên.
+- Kiểm thử trình duyệt qua bảy vai trò, tại 1440 và 1024 px: chuông, bảng nhắc nhanh, Escape trả focus về chuông, trang Việc cần làm, trạng thái trống và không tràn ngang.
+- Backend/frontend: format, lint, typecheck, production build và unit test đều đạt; hồi quy nâng cấp đạt 24/24.
+
+# Cập nhật trải nghiệm sinh viên ngày 16/10/2026
+
+- Không gian Sinh viên chỉ giữ Tổng quan cho kỳ đang diễn ra và Lịch sử thực tập cho các kỳ đã hoàn thành. URL cũ `/workspace/student/summary` chuyển về Tổng quan để giữ các liên kết đã lưu.
+- Lịch sử dùng thẻ theo từng kỳ và phân trang thời gian; không có bảng, tìm kiếm, bộ lọc học vụ hoặc lịch sử đăng ký. Điểm chỉ có liên kết khi kết quả đã được công bố.
+- Frontend đã PASS Prettier, typecheck và ESLint. Môi trường Docker QA đã được dựng lại từ mã nguồn mới để kiểm tra trực quan ở 1440 và 1024 px.
+
+# Cập nhật kiểm thử tổng hợp và lịch sử ngày 14/10/2026
+
+Xem [biên bản nghiệm thu tổng hợp và lịch sử](REPORTING_VERIFICATION_2026_10_14.md) và [hướng dẫn triển khai](REPORTING.md). Các phần còn lại giữ kết quả lịch sử của những đợt kiểm thử trước.
+
 # Cập nhật kiểm thử ngày 11/09/2026
 
 - Kết quả cuối lượt: 14/14 unit backend, 22/22 integration PostgreSQL, 8/8 test logic frontend PASS. Lint, typecheck và production build backend/frontend PASS. Migration audit reason đã áp dụng thành công trên database test và local; không reset dữ liệu. Hai lỗi thiếu trường bắt buộc trong fixture mới đã được sửa trước khi chạy lại toàn bộ integration.

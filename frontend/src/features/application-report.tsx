@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
+import { MentorHistory, MentorRequest } from "./mentor-request-ui";
 import { ExportReport } from "./report-actions";
 const statuses: Record<string, string> = {
   Draft: "Bản nháp",
@@ -16,6 +17,8 @@ type Result = {
     id: string;
     status: string;
     eligibilityPassed: boolean;
+    mentorRequests?: MentorRequest[];
+    internship?: { facultyMentor: { fullName: string } } | null;
     student: { fullName: string; studentCode: string; className: string };
     period: { name: string };
     company: { name: string } | null;
@@ -120,6 +123,7 @@ export function ApplicationReport({ periodId }: { periodId: string }) {
                       <th>Doanh nghiệp</th>
                       <th>Điều kiện lúc đăng ký</th>
                       <th>Trạng thái</th>
+                      <th>Nguyện vọng / phân công</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -142,6 +146,12 @@ export function ApplicationReport({ periodId }: { periodId: string }) {
                             : "Chưa đủ điều kiện"}
                         </td>
                         <td>{statuses[item.status] || "Chưa xác định"}</td>
+                        <td>
+                          <MentorHistory
+                            requests={item.mentorRequests}
+                            assigned={item.internship?.facultyMentor.fullName}
+                          />
+                        </td>
                       </tr>
                     ))}
                   </tbody>

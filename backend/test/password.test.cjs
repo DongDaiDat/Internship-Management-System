@@ -32,13 +32,21 @@ test("roles receive only their planned workflow permissions", () => {
   assert.ok(
     permissionsFor(["Admin", "FacultyManager"]).includes("internships:approve"),
   );
-  assert.deepEqual(permissionsFor(["Student"]), ["internships:student"]);
-  assert.deepEqual(permissionsFor(["FacultyMentor"]), ["internships:mentor"]);
+  assert.deepEqual(permissionsFor(["Student"]), [
+    "internships:student",
+    "reports:student",
+  ]);
+  assert.deepEqual(permissionsFor(["FacultyMentor"]), [
+    "internships:mentor",
+    "reports:mentor",
+  ]);
   assert.deepEqual(permissionsFor(["CompanySupervisor"]), [
     "internships:company",
+    "reports:company",
   ]);
   assert.deepEqual(permissionsFor(["InternshipCoordinator"]), [
     "periods:write",
+    "reports:department",
     "profiles:write",
     "operations:write",
     "dashboard:read",
@@ -47,5 +55,6 @@ test("roles receive only their planned workflow permissions", () => {
   assert.deepEqual(permissionsFor(["FacultyManager"]), [
     "internships:approve",
     "dashboard:read",
+    "reports:department",
   ]);
 });

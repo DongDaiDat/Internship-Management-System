@@ -57,7 +57,7 @@ async function main() {
       assert.equal((await me.json()).email, email);
       assert.equal(
         (
-          await context.request.get("http://localhost:3300/api/dashboard")
+          await context.request.get("http://localhost:3300/api/users/summary")
         ).status(),
         email.startsWith("admin") ? 200 : 403,
       );

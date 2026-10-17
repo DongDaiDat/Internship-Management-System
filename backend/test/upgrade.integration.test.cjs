@@ -342,11 +342,22 @@ test("import → verify → bulk provision is concurrent-safe and rejects duplic
   assert.equal(response.status, 201);
   const preview = await response.json();
   assert.deepEqual(preview.errors, []);
-  await db.user.update({ where: { id: users.InternshipCoordinator.id }, data: { departmentId: other.id } });
+  await db.user.update({
+    where: { id: users.InternshipCoordinator.id },
+    data: { departmentId: other.id },
+  });
   try {
-    await call(`/imports/${preview.batchId}/confirm`, "InternshipCoordinator", {}, 403);
+    await call(
+      `/imports/${preview.batchId}/confirm`,
+      "InternshipCoordinator",
+      {},
+      403,
+    );
   } finally {
-    await db.user.update({ where: { id: users.InternshipCoordinator.id }, data: { departmentId: dep.id } });
+    await db.user.update({
+      where: { id: users.InternshipCoordinator.id },
+      data: { departmentId: dep.id },
+    });
   }
   await call(
     `/imports/${preview.batchId}/confirm`,

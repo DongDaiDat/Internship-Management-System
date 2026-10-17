@@ -1,6 +1,8 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api";
+import { useSearchParams } from "next/navigation";
+import { MentorHistory, MentorRequest } from "./mentor-request-ui";
 import { FilePanel } from "./file-panel";
 
 type Workspace = {
@@ -13,6 +15,7 @@ type Workspace = {
     _count: { internships: number };
   }[];
   applications: {
+    mentorRequests?: MentorRequest[];
     id: string;
     student: {
       fullName: string;
@@ -20,7 +23,12 @@ type Workspace = {
       completedCredits: number;
       programCredits: number;
     };
-    period: { name: string };
+    period: {
+      name: string;
+      status: string;
+      registrationEndsAt: string;
+      endsAt: string;
+    };
     company: { name: string; isVerified: boolean } | null;
     externalCompanyName: string | null;
     eligibilityPassed: boolean;
@@ -48,6 +56,13 @@ type Workspace = {
     finalGrade: { total: number; letterGrade: string } | null;
   }[];
 };
+function approvalOpen(period: Workspace["applications"][number]["period"]) {
+  return (
+    period.status === "Published" &&
+    Date.now() > Date.parse(period.registrationEndsAt) &&
+    Date.now() < Date.parse(period.endsAt)
+  );
+}
 export function FacultyPortal({
   canApprove = true,
   view = "approvals",
@@ -58,6 +73,9 @@ export function FacultyPortal({
   periodId?: string;
 }) {
   const [applicationPage, setApplicationPage] = useState(1);
+  const params = useSearchParams();
+  const applicationId = params.get("applicationId") || "",
+    internshipId = params.get("internshipId") || "";
   const [internshipPage, setInternshipPage] = useState(1);
   const [data, setData] = useState<Workspace | null>(null);
   const [companies, setCompanies] = useState<{ id: string; name: string }[]>(
@@ -75,7 +93,7 @@ export function FacultyPortal({
     async (signal?: AbortSignal) => {
       const [workspace, choices] = await Promise.all([
         api<Workspace>(
-          `/faculty-workspace?${new URLSearchParams({ view, applicationPage: String(applicationPage), internshipPage: String(internshipPage), ...(periodId ? { periodId } : {}) })}`,
+          `/faculty-workspace?${new URLSearchParams({ view, applicationPage: String(applicationPage), internshipPage: String(internshipPage), ...(periodId ? { periodId } : {}), ...(applicationId ? { applicationId } : {}), ...(internshipId ? { internshipId } : {}) })}`,
           { signal },
         ),
         api<{ id: string; name: string }[]>("/companies", { signal }),
@@ -84,7 +102,14 @@ export function FacultyPortal({
       setData(workspace);
       setCompanies(choices);
     },
-    [applicationPage, internshipPage, periodId, view],
+    [
+      applicationPage,
+      internshipPage,
+      periodId,
+      view,
+      applicationId,
+      internshipId,
+    ],
   );
   useEffect(() => {
     const controller = new AbortController();
@@ -213,6 +238,7 @@ export function FacultyPortal({
                       Tín chỉ: {a.student.completedCredits}/
                       {a.student.programCredits}
                     </p>
+                    <MentorHistory requests={a.mentorRequests} />
                     {a.eligibilityReason && <p>{a.eligibilityReason}</p>}
                     {view === "approvals" && (
                       <details>
@@ -301,7 +327,18 @@ export function FacultyPortal({
                         )}
                       </details>
                     )}
+                    {view === "approvals" && !approvalOpen(a.period) && (
+                      <p className="info-note">
+                        Chỉ duyệt sau khi đóng đăng ký (
+                        {new Date(a.period.registrationEndsAt).toLocaleString(
+                          "vi-VN",
+                        )}
+                        ) và trước khi kết thúc thực tập. Tải lại trang khi đến
+                        thời gian duyệt.
+                      </p>
+                    )}
                     {view === "approvals" &&
+                      approvalOpen(a.period) &&
                       (a.company?.isVerified &&
                       (a.eligibilityPassed ||
                         a.exceptionRequest?.status === "Approved") ? (
@@ -317,35 +354,12 @@ export function FacultyPortal({
                             });
                           }}
                         >
-                          <label>
-                            Giảng viên hướng dẫn
-                            <select
-                              aria-label="Giảng viên hướng dẫn"
-                              name="facultyMentorId"
-                              required
-                              defaultValue=""
-                            >
-                              <option value="" disabled>
-                                Chọn giảng viên còn quota
-                              </option>
-                              {data.faculty.map((f) => (
-                                <option
-                                  key={f.id}
-                                  value={f.id}
-                                  disabled={
-                                    f._count.internships >= f.maxStudents
-                                  }
-                                >
-                                  {f.fullName} · {f._count.internships}/
-                                  {f.maxStudents}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                          <label>
-                            Ghi chú
-                            <input name="note" maxLength={500} />
-                          </label>
+                          <AssignmentFields
+                            key={a.id}
+                            faculty={data.faculty}
+                            requests={a.mentorRequests ?? []}
+                            disabled={busy || !!pending}
+                          />
                           <button
                             className="button primary"
                             disabled={busy || !!pending}
@@ -665,5 +679,79 @@ export function FacultyPortal({
         </>
       )}
     </section>
+  );
+}
+
+function AssignmentFields({
+  faculty,
+  requests,
+  disabled,
+}: {
+  faculty: Workspace["faculty"];
+  requests: MentorRequest[];
+  disabled: boolean;
+}) {
+  const accepted = requests.find(
+    (r) => !r.closedAt && r.response === "Accepted",
+  );
+  const [selected, setSelected] = useState(
+    () =>
+      faculty.find(
+        (f) =>
+          f.id === accepted?.facultyMentorId &&
+          f._count.internships < f.maxStudents,
+      )?.id ?? "",
+  );
+  const requiresReason =
+    (!!accepted && accepted.facultyMentorId !== selected) ||
+    requests.some(
+      (r) => r.facultyMentorId === selected && r.response === "Declined",
+    );
+  return (
+    <fieldset disabled={disabled}>
+      <label>
+        Giảng viên hướng dẫn
+        <select
+          aria-label="Giảng viên hướng dẫn"
+          name="facultyMentorId"
+          required
+          value={selected}
+          onChange={(e) => setSelected(e.target.value)}
+        >
+          <option value="" disabled>
+            Chọn giảng viên còn chỉ tiêu
+          </option>
+          {faculty.map((f) => (
+            <option
+              key={f.id}
+              value={f.id}
+              disabled={f._count.internships >= f.maxStudents}
+            >
+              {f.fullName} · {f._count.internships}/{f.maxStudents}
+            </option>
+          ))}
+        </select>
+      </label>
+      {accepted && (
+        <p className="info-note">
+          Nguyện vọng đã được đồng ý được gợi ý khi giảng viên còn hợp lệ và còn
+          chỉ tiêu. Khoa quyết định phân công cuối cùng.
+        </p>
+      )}
+      <label>
+        Lý do phân công / ghi chú
+        <textarea
+          name="note"
+          maxLength={500}
+          minLength={requiresReason ? 10 : undefined}
+          required={requiresReason}
+          placeholder={
+            requiresReason
+              ? "Nhập lý do phân công khác nguyện vọng hoặc chọn giảng viên đã từ chối (10–500 ký tự)."
+              : "Ghi chú quyết định của khoa (không bắt buộc)."
+          }
+        />
+      </label>
+    </fieldset>
   );
 }
