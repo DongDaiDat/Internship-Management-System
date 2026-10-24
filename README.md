@@ -1,4 +1,4 @@
-# Hệ thống quản lý thực tập tốt nghiệpp
+# Hệ thống quản lý thực tập tốt nghiệp
 
 Đây là hệ thống quản lý thực tập tốt nghiệp dành riêng cho Trường Công nghệ Thông tin, Đại học Phenikaa. Cấu trúc được tổ chức theo domain để các tính năng tiếp theo được đặt đúng vị trí ngay từ đầu.
 
