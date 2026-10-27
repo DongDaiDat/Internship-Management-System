@@ -69,6 +69,7 @@ model User {
   updatedAt    DateTime  @updatedAt
   roles        UserRole[]
   sessions     Session[]
+  notificationSnoozes NotificationSnooze[]
   auditLogs    AuditLog[]
   studentProfile StudentProfile?
   facultyProfile FacultyProfile?
@@ -96,6 +97,20 @@ model Session {
 
   @@index([userId])
   @@index([expiresAt])
+}
+
+model NotificationSnooze {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @db.Uuid
+  role        Role
+  taskId      String   @db.VarChar(255)
+  hiddenUntil DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, role, taskId])
+  @@index([userId, role, hiddenUntil])
 }
 
 model AuditLog {

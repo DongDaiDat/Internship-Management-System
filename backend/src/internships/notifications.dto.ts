@@ -11,6 +11,9 @@ import {
 } from "class-validator";
 export class NotificationQueryDto {
   @IsOptional()
+  @IsIn(["active", "hidden"])
+  visibility: "active" | "hidden" = "active";
+  @IsOptional()
   @IsIn(["overdue", "urgent", "soon", "pending"])
   priority?: string;
   @IsOptional() @IsString() @MaxLength(60) type?: string;

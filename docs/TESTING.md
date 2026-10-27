@@ -142,6 +142,12 @@ Frontend đã PASS format/lint/typecheck, 8 test báo cáo và production build.
 - Kiểm thử trình duyệt qua bảy vai trò, tại 1440 và 1024 px: chuông, bảng nhắc nhanh, Escape trả focus về chuông, trang Việc cần làm, trạng thái trống và không tràn ngang.
 - Backend/frontend: format, lint, typecheck, production build và unit test đều đạt; hồi quy nâng cấp đạt 24/24.
 
+# Cập nhật tạm ẩn nhắc việc ngày 19/10/2026
+
+- Migration `20261019000000_notification_snoozes` đã áp dụng thành công trên PostgreSQL kiểm thử riêng.
+- Hồi quy nâng cấp đạt 25/25, gồm mốc 08:00 theo `Asia/Ho_Chi_Minh`, tạm ẩn/khôi phục, tự hiện lại khi hết hạn và cách ly giữa các tài khoản.
+- Frontend đã PASS Prettier, typecheck, ESLint và production build; kiểm tra chuông, trang Việc cần làm và ảnh chụp desktop 1440/1024 px cho bảy vai trò.
+
 # Cập nhật trải nghiệm sinh viên ngày 16/10/2026
 
 - Không gian Sinh viên chỉ giữ Tổng quan cho kỳ đang diễn ra và Lịch sử thực tập cho các kỳ đã hoàn thành. URL cũ `/workspace/student/summary` chuyển về Tổng quan để giữ các liên kết đã lưu.

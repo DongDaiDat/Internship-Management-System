@@ -1,4 +1,13 @@
-import { Controller, Get, Query, Req } from "@nestjs/common";
+import {
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  Post,
+  Query,
+  Req,
+} from "@nestjs/common";
 import type { AuthRequest } from "../auth/auth.types";
 import { NotificationsService } from "./notifications.service";
 import { NotificationQueryDto } from "./notifications.dto";
@@ -13,5 +22,14 @@ export class NotificationsController {
     @Query() q: NotificationQueryDto,
   ) {
     return this.service.list(req.authUser!, q);
+  }
+  @Post("tasks/:taskId/snooze")
+  @HttpCode(200)
+  snooze(@Req() req: AuthRequest, @Param("taskId") taskId: string) {
+    return this.service.snooze(req.authUser!, taskId);
+  }
+  @Delete("tasks/:taskId/snooze")
+  async restore(@Req() req: AuthRequest, @Param("taskId") taskId: string) {
+    await this.service.restore(req.authUser!, taskId);
   }
 }

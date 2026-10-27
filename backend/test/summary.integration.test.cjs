@@ -45,6 +45,19 @@ async function request(path, actor, body, expected = 200) {
   assert.equal(res.status, expected, `${actor} ${path}: ${text.slice(0, 300)}`);
   return text ? JSON.parse(text) : null;
 }
+async function taskMutation(path, actor, method, expected = 200) {
+  const res = await fetch(base + path, {
+    method,
+    headers: { Cookie: cookies[actor], Origin: "http://localhost:3000" },
+  });
+  const text = await res.text();
+  assert.equal(
+    res.status,
+    expected,
+    `${actor} ${method} ${path}: ${text.slice(0, 300)}`,
+  );
+  return text ? JSON.parse(text) : null;
+}
 before(async () => {
   dep = await db.department.create({
     data: { code: suffix.slice(0, 30), name: "Khoa thống kê thử nghiệm" },
@@ -210,6 +223,7 @@ after(async () => {
 test("reminders classify 72h, 24h and deadline boundaries without a fake overdue date", () => {
   const {
     taskPriority,
+    nextSnoozeExpiry,
   } = require("../.test-build/internships/notifications.service");
   const now = new Date("2026-10-14T00:00:00Z");
   for (const [offset, expected] of [
@@ -222,6 +236,10 @@ test("reminders classify 72h, 24h and deadline boundaries without a fake overdue
   ])
     assert.equal(taskPriority(new Date(+now + offset), now), expected);
   assert.equal(taskPriority(null, now), "pending");
+  assert.equal(
+    nextSnoozeExpiry(new Date("2026-10-19T16:30:00Z")).toISOString(),
+    "2026-10-20T01:00:00.000Z",
+  );
 });
 
 test("notification APIs scope seven roles, paginate, filter and do not leak former assignments", async () => {
@@ -300,6 +318,66 @@ test("notification APIs scope seven roles, paginate, filter and do not leak form
       )
     ).internshipTotal,
     0,
+  );
+});
+
+test("notifications can be hidden until the next Vietnam morning and restored without changing work", async () => {
+  const before = await request("/notifications/tasks", "Student");
+  assert.ok(before.items.length > 0);
+  const task = before.items[0];
+  const hidden = await taskMutation(
+    `/notifications/tasks/${encodeURIComponent(task.id)}/snooze`,
+    "Student",
+    "POST",
+  );
+  assert.equal(hidden.taskId, task.id);
+  assert.match(hidden.hiddenUntil, /^\d{4}-\d{2}-\d{2}T01:00:00\.000Z$/);
+  const active = await request("/notifications/tasks", "Student");
+  assert.ok(!active.items.some((item) => item.id === task.id));
+  assert.equal(
+    (await request("/notifications/summary", "Student")).total,
+    active.total,
+  );
+  const hiddenList = await request(
+    "/notifications/tasks?visibility=hidden",
+    "Student",
+  );
+  assert.ok(hiddenList.items.some((item) => item.id === task.id));
+  await taskMutation(
+    `/notifications/tasks/${encodeURIComponent(task.id)}/snooze`,
+    "OtherStudent",
+    "POST",
+    404,
+  );
+  await taskMutation(
+    `/notifications/tasks/${encodeURIComponent(task.id)}/snooze`,
+    "Student",
+    "DELETE",
+  );
+  assert.ok(
+    (await request("/notifications/tasks", "Student")).items.some(
+      (item) => item.id === task.id,
+    ),
+  );
+  await taskMutation(
+    `/notifications/tasks/${encodeURIComponent(task.id)}/snooze`,
+    "Student",
+    "POST",
+  );
+  await db.notificationSnooze.update({
+    where: {
+      userId_role_taskId: {
+        userId: users.Student.id,
+        role: "Student",
+        taskId: task.id,
+      },
+    },
+    data: { hiddenUntil: new Date(Date.now() - 1) },
+  });
+  assert.ok(
+    (await request("/notifications/tasks", "Student")).items.some(
+      (item) => item.id === task.id,
+    ),
   );
 });
 

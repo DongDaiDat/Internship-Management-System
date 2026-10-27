@@ -71,6 +71,23 @@ async function main() {
           false,
           `${role}/${width} overflow`,
         );
+        if (role === "Student" && width === 1440) {
+          const snooze = page.getByRole("button", {
+            name: "Ẩn đến 08:00 ngày mai",
+          });
+          if (await snooze.count()) {
+            await snooze.first().click();
+            await page.getByRole("tab", { name: "Đã tạm ẩn" }).click();
+            const restore = page.getByRole("button", { name: "Hiện lại" });
+            await restore.first().waitFor();
+            await restore.first().click();
+            await page.getByRole("tab", { name: "Đang hiện" }).click();
+            await page
+              .getByRole("button", { name: "Ẩn đến 08:00 ngày mai" })
+              .first()
+              .waitFor();
+          }
+        }
         await page.screenshot({
           path: join(output, `${slug}-${width}.png`),
           fullPage: true,

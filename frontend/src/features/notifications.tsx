@@ -21,6 +21,7 @@ type Task = {
   priority: string;
   dueAt: string | null;
   count: number;
+  hiddenUntil?: string;
   period: { id: string; name: string } | null;
   blocked: boolean;
   actionLabel: string;
@@ -52,7 +53,17 @@ const NotificationContext = createContext<{
   error: string;
   loading: boolean;
   refresh: () => void;
-}>({ summary: null, data: null, error: "", loading: true, refresh: () => {} });
+  snooze: (taskId: string) => Promise<void>;
+  restore: (taskId: string) => Promise<void>;
+}>({
+  summary: null,
+  data: null,
+  error: "",
+  loading: true,
+  refresh: () => {},
+  snooze: async () => {},
+  restore: async () => {},
+});
 
 export function NotificationsProvider({ children }: { children: ReactNode }) {
   const [summary, setSummary] = useState<Summary | null>(null),
@@ -83,6 +94,24 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         if (!c.signal.aborted) setLoading(false);
       });
   }, []);
+  const snooze = useCallback(
+    async (taskId: string) => {
+      await api(`/notifications/tasks/${encodeURIComponent(taskId)}/snooze`, {
+        method: "POST",
+      });
+      refresh();
+    },
+    [refresh],
+  );
+  const restore = useCallback(
+    async (taskId: string) => {
+      await api(`/notifications/tasks/${encodeURIComponent(taskId)}/snooze`, {
+        method: "DELETE",
+      });
+      refresh();
+    },
+    [refresh],
+  );
   useEffect(() => {
     refresh();
     const visible = () => {
@@ -102,7 +131,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   }, [refresh]);
   return (
     <NotificationContext.Provider
-      value={{ summary, data, error, loading, refresh }}
+      value={{ summary, data, error, loading, refresh, snooze, restore }}
     >
       {children}
     </NotificationContext.Provider>
@@ -111,10 +140,37 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 function TaskRows({
   items,
   onNavigate,
+  visibility = "active",
+  onSnooze,
+  onRestore,
 }: {
   items: Task[];
   onNavigate?: () => void;
+  visibility?: "active" | "hidden";
+  onSnooze?: (taskId: string) => Promise<void>;
+  onRestore?: (taskId: string) => Promise<void>;
 }) {
+  const [working, setWorking] = useState<string | null>(null),
+    [actionError, setActionError] = useState("");
+  const mutate = async (
+    taskId: string,
+    action?: (id: string) => Promise<void>,
+  ) => {
+    if (!action) return;
+    setActionError("");
+    setWorking(taskId);
+    try {
+      await action(taskId);
+    } catch (error) {
+      setActionError(
+        error instanceof Error
+          ? error.message
+          : "Không cập nhật được trạng thái nhắc việc.",
+      );
+    } finally {
+      setWorking(null);
+    }
+  };
   return (
     <ul className="notification-list">
       {items.map((t) => (
@@ -134,6 +190,16 @@ function TaskRows({
               ? `Hạn: ${new Date(t.dueAt).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", dateStyle: "short", timeStyle: "short" })}`
               : "Chưa có hạn xử lý"}
           </small>
+          {visibility === "hidden" && t.hiddenUntil && (
+            <small>
+              Hiện lại lúc:{" "}
+              {new Date(t.hiddenUntil).toLocaleString("vi-VN", {
+                timeZone: "Asia/Ho_Chi_Minh",
+                dateStyle: "short",
+                timeStyle: "short",
+              })}
+            </small>
+          )}
           {t.blocked && (
             <p className="notification-blocked">
               Thao tác đang bị giới hạn bởi lịch của đợt hoặc trạng thái hồ sơ.
@@ -143,13 +209,33 @@ function TaskRows({
           <Link onClick={onNavigate} href={t.href}>
             {t.actionLabel} →
           </Link>
+          {visibility === "active" ? (
+            <button
+              className="notification-snooze"
+              type="button"
+              disabled={working === t.id}
+              onClick={() => void mutate(t.id, onSnooze)}
+            >
+              {working === t.id ? "Đang ẩn…" : "Ẩn đến 08:00 ngày mai"}
+            </button>
+          ) : (
+            <button
+              className="notification-snooze"
+              type="button"
+              disabled={working === t.id}
+              onClick={() => void mutate(t.id, onRestore)}
+            >
+              {working === t.id ? "Đang khôi phục…" : "Hiện lại"}
+            </button>
+          )}
         </li>
       ))}
+      {actionError && <li role="alert">{actionError}</li>}
     </ul>
   );
 }
 export function NotificationBell() {
-  const { summary, data, error, loading, refresh } =
+  const { summary, data, error, loading, refresh, snooze } =
     useContext(NotificationContext);
   const [open, setOpen] = useState(false),
     ref = useRef<HTMLDivElement>(null),
@@ -246,7 +332,11 @@ export function NotificationBell() {
           )}
           {loading && <p role="status">Đang cập nhật…</p>}
           {data && (
-            <TaskRows items={data.items} onNavigate={() => setOpen(false)} />
+            <TaskRows
+              items={data.items}
+              onNavigate={() => setOpen(false)}
+              onSnooze={snooze}
+            />
           )}
           {!error && !loading && data?.total === 0 && (
             <p className="empty-state">Bạn không có việc cần xử lý lúc này.</p>
@@ -264,7 +354,8 @@ export function NotificationBell() {
   );
 }
 export function TasksPreview() {
-  const { data, error, loading, refresh } = useContext(NotificationContext),
+  const { data, error, loading, refresh, snooze } =
+      useContext(NotificationContext),
     pathname = usePathname(),
     root = pathname.split("/").slice(0, 3).join("/");
   return (
@@ -279,7 +370,7 @@ export function TasksPreview() {
         </p>
       )}
       {loading && !data && <p role="status">Đang tải…</p>}
-      {data && <TaskRows items={data.items.slice(0, 4)} />}
+      {data && <TaskRows items={data.items.slice(0, 4)} onSnooze={snooze} />}
       {!error && !loading && data?.total === 0 && (
         <p>Không có công việc cần xử lý.</p>
       )}
@@ -291,7 +382,7 @@ export function TasksPage() {
     pathname = usePathname(),
     router = useRouter(),
     query = params.toString();
-  const { summary } = useContext(NotificationContext);
+  const { summary, refresh } = useContext(NotificationContext);
   const [data, setData] = useState<Data | null>(null),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(true),
@@ -323,6 +414,15 @@ export function TasksPage() {
     if (key !== "page") q.delete("page");
     router.push(`${pathname}?${q}`);
   };
+  const visibility = (params.get("visibility") || "active") as
+    "active" | "hidden";
+  const mutate = async (taskId: string, action: "snooze" | "restore") => {
+    await api(`/notifications/tasks/${encodeURIComponent(taskId)}/snooze`, {
+      method: action === "snooze" ? "POST" : "DELETE",
+    });
+    refresh();
+    setRetry((value) => value + 1);
+  };
   const select = (
     key: string,
     label: string,
@@ -347,9 +447,33 @@ export function TasksPage() {
   return (
     <section className="card notification-page">
       <p>
-        Việc tự cập nhật theo hồ sơ thực tế. Số trên chuông là số mục cần xử lý;
-        một mục đôn đốc có thể gồm nhiều hồ sơ.
+        Việc tự cập nhật theo hồ sơ thực tế. Bạn có thể tạm ẩn một việc đến
+        08:00 ngày mai mà không làm thay đổi trạng thái nghiệp vụ.
       </p>
+      <div
+        className="notification-visibility"
+        role="tablist"
+        aria-label="Trạng thái hiển thị"
+      >
+        <button
+          type="button"
+          role="tab"
+          aria-selected={visibility === "active"}
+          className={visibility === "active" ? "is-selected" : ""}
+          onClick={() => change("visibility", "active")}
+        >
+          Đang hiện
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={visibility === "hidden"}
+          className={visibility === "hidden" ? "is-selected" : ""}
+          onClick={() => change("visibility", "hidden")}
+        >
+          Đã tạm ẩn
+        </button>
+      </div>
       <form
         className="summary-search"
         onSubmit={(e) => {
@@ -398,7 +522,12 @@ export function TasksPage() {
             <p>
               <strong>{data.total}</strong> việc phù hợp
             </p>
-            <TaskRows items={data.items} />
+            <TaskRows
+              items={data.items}
+              visibility={visibility}
+              onSnooze={(taskId) => mutate(taskId, "snooze")}
+              onRestore={(taskId) => mutate(taskId, "restore")}
+            />
             {!data.total && (
               <p className="empty-state">
                 Không có công việc phù hợp với bộ lọc.

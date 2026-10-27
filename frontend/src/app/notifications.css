@@ -115,6 +115,46 @@
   font-size: 14px;
   font-weight: 600;
 }
+.notification-snooze {
+  margin: 12px 0 0 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #52647d;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.notification-snooze:hover:not(:disabled) {
+  color: #123b70;
+}
+.notification-snooze:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+.notification-visibility {
+  display: flex;
+  gap: 8px;
+  margin: 20px 0 4px;
+}
+.notification-visibility button {
+  border: 1px solid #d8e0ed;
+  border-radius: 8px;
+  background: #fff;
+  color: #52647d;
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.notification-visibility button.is-selected {
+  border-color: #123b70;
+  background: #123b70;
+  color: #fff;
+}
 .notification-priority {
   border-radius: 16px;
   padding: 4px 8px;

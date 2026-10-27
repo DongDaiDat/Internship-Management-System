@@ -1,4 +1,8 @@
-import { ForbiddenException, Injectable } from "@nestjs/common";
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { Prisma, Role } from "@prisma/client";
 import { AuthUser } from "../auth/auth.types";
 import { PrismaService } from "../prisma/prisma.service";
@@ -17,6 +21,28 @@ export function taskPriority(deadline: Date | null, now: Date) {
       : remaining <= 259200000
         ? "soon"
         : "pending";
+}
+/** The next 08:00 in Asia/Ho_Chi_Minh. Vietnam is UTC+07:00 year-round. */
+export function nextSnoozeExpiry(now: Date) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  const part = (name: string) =>
+    Number(parts.find((p) => p.type === name)?.value);
+  const nextDay = new Date(
+    Date.UTC(part("year"), part("month") - 1, part("day") + 1),
+  );
+  return new Date(
+    Date.UTC(
+      nextDay.getUTCFullYear(),
+      nextDay.getUTCMonth(),
+      nextDay.getUTCDate(),
+      1,
+    ),
+  );
 }
 type Task = {
   id: string;
@@ -48,10 +74,13 @@ export class NotificationsService {
     private readonly db: PrismaService,
     private readonly reports: SummaryService,
   ) {}
-  async tasks(user: AuthUser, now = new Date()) {
+  private role(user: AuthUser) {
     if (user.roles.length !== 1)
       throw new ForbiddenException("Vui lòng chọn không gian làm việc.");
-    const role = user.roles[0],
+    return user.roles[0];
+  }
+  async tasks(user: AuthUser, now = new Date()) {
+    const role = this.role(user),
       root = `/workspace/${paths[role]}`;
     const tasks: Task[] = [];
     const add = (
@@ -629,7 +658,7 @@ export class NotificationsService {
   }
   async summary(user: AuthUser) {
     const now = new Date(),
-      tasks = await this.tasks(user, now);
+      tasks = await this.visibleTasks(user, now, "active");
     return {
       total: tasks.length,
       counts: Object.fromEntries(
@@ -643,7 +672,7 @@ export class NotificationsService {
   }
   async list(user: AuthUser, q: NotificationQueryDto) {
     const now = new Date(),
-      all = await this.tasks(user, now);
+      all = await this.visibleTasks(user, now, q.visibility);
     const normalize = (s: string) =>
       s
         .normalize("NFD")
@@ -682,5 +711,53 @@ export class NotificationsService {
         ],
       },
     };
+  }
+  private async visibleTasks(
+    user: AuthUser,
+    now: Date,
+    visibility: "active" | "hidden",
+  ) {
+    const role = this.role(user);
+    const all = await this.tasks(user, now);
+    const snoozed = await this.db.notificationSnooze.findMany({
+      where: {
+        userId: user.id,
+        role,
+        hiddenUntil: { gt: now },
+        taskId: { in: all.map((task) => task.id) },
+      },
+      select: { taskId: true, hiddenUntil: true },
+    });
+    const hidden = new Map(
+      snoozed.map((item) => [item.taskId, item.hiddenUntil]),
+    );
+    return all
+      .filter((task) =>
+        visibility === "hidden" ? hidden.has(task.id) : !hidden.has(task.id),
+      )
+      .map((task) => ({
+        ...task,
+        ...(hidden.get(task.id)
+          ? { hiddenUntil: hidden.get(task.id)!.toISOString() }
+          : {}),
+      }));
+  }
+  async snooze(user: AuthUser, taskId: string, now = new Date()) {
+    const role = this.role(user);
+    if (!(await this.tasks(user, now)).some((task) => task.id === taskId))
+      throw new NotFoundException("Nhắc việc không còn cần xử lý.");
+    const hiddenUntil = nextSnoozeExpiry(now);
+    await this.db.notificationSnooze.upsert({
+      where: { userId_role_taskId: { userId: user.id, role, taskId } },
+      create: { userId: user.id, role, taskId, hiddenUntil },
+      update: { hiddenUntil },
+    });
+    return { taskId, hiddenUntil: hiddenUntil.toISOString() };
+  }
+  async restore(user: AuthUser, taskId: string) {
+    const role = this.role(user);
+    await this.db.notificationSnooze.deleteMany({
+      where: { userId: user.id, role, taskId },
+    });
   }
 }
